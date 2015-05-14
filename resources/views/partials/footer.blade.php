@@ -1,32 +1,31 @@
-<footer>
 <div class="footer">
     <div class="container">
-            {{--<div class="row">--}}
-                {{--<div class="col-md-2">--}}
-                    {{--<h3>Улаанбаатар</h3>--}}
-                    {{--<iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n720/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>--}}
-                {{--</div>--}}
-                {{--<div class="col-md-2">--}}
-                    {{--<h3>New York</h3>--}}
-                    {{--<iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n179/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>--}}
-                {{--</div>--}}
-                {{--<div class="col-md-2">--}}
-                    {{--<h3>Tokyo</h3>--}}
-                    {{--<iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n248/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>--}}
-                {{--</div>--}}
-                {{--<div class="col-md-2">--}}
-                    {{--<h3>Vancouver</h3>--}}
-                    {{--<iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n256/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>--}}
-                {{--</div>--}}
-                {{--<div class="col-md-2">--}}
-                    {{--<h3>Canberra</h3>--}}
-                    {{--<iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n57/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>--}}
-                {{--</div>--}}
-                {{--<div class="col-md-2">--}}
-                    {{--<h3>Korea</h3>--}}
-                    {{--<iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n57/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>--}}
-                {{--</div>--}}
-            {{--</div>--}}
+            <div class="row">
+                <div class="col-md-2">
+                    <h3>Улаанбаатар</h3>
+                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n720/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
+                </div>
+                <div class="col-md-2">
+                    <h3>New York</h3>
+                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n179/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
+                </div>
+                <div class="col-md-2">
+                    <h3>Tokyo</h3>
+                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n248/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
+                </div>
+                <div class="col-md-2">
+                    <h3>Vancouver</h3>
+                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n256/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
+                </div>
+                <div class="col-md-2">
+                    <h3>Canberra</h3>
+                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n57/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
+                </div>
+                <div class="col-md-2">
+                    <h3>Korea</h3>
+                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n57/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
+                </div>
+            </div>
         <div class="row topspace">
             <div class="col-md-3">
                 <h4>Сайтын тухай</h4>
@@ -59,10 +58,10 @@
             <div class="col-md-3">
                 <h4>Таньд хэрэгтэй</h4>
                 <ul>
-                    {{--<li><a href="#">123</a></li>--}}
-                    {{--<li><a href="#">123</a></li>--}}
-                    {{--<li><a href="#">123</a></li>--}}
-                    {{--<li><a href="#">123</a></li>--}}
+                    <li><a href="#">123</a></li>
+                    <li><a href="#">123</a></li>
+                    <li><a href="#">123</a></li>
+                    <li><a href="#">123</a></li>
                 </ul>
             </div>
         </div>
@@ -73,4 +72,3 @@
         </div>
     </div>
 </div>
-</footer>

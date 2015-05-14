@@ -19,8 +19,5 @@
             </div>
         </div>
     </div>
-    <br />
-    <br />
-    <br />
-    <hr />
+
 @stop

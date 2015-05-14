@@ -1,825 +1,279 @@
-/**
- * Super simple wysiwyg editor on Bootstrap v0.6.6
- * http://summernote.org/
- *
- * summernote.js
- * Copyright 2013-2015 Alan Hong. and other contributors
- * summernote may be freely distributed under the MIT license./
- *
- * Date: 2015-04-29T19:14Z
- */
-(function (factory) {
-  /* global define */
-  if (typeof define === 'function' && define.amd) {
-    // AMD. Register as an anonymous module.
-    define(['jquery'], factory);
-  } else {
-    // Browser globals: jQuery
-    factory(window.jQuery);
-  }
-}(function ($) {
-  
-
-
-  if (!Array.prototype.reduce) {
-    /**
-     * Array.prototype.reduce polyfill
-     *
-     * @param {Function} callback
-     * @param {Value} [initialValue]
-     * @return {Value}
-     *
-     * @see http://goo.gl/WNriQD
-     */
-    Array.prototype.reduce = function (callback) {
-      var t = Object(this), len = t.length >>> 0, k = 0, value;
-      if (arguments.length === 2) {
-        value = arguments[1];
-      } else {
-        while (k < len && !(k in t)) {
-          k++;
-        }
-        if (k >= len) {
-          throw new TypeError('Reduce of empty array with no initial value');
-        }
-        value = t[k++];
-      }
-      for (; k < len; k++) {
-        if (k in t) {
-          value = callback(value, t[k], k, t);
-        }
-      }
-      return value;
-    };
-  }
-
-  if ('function' !== typeof Array.prototype.filter) {
-    /**
-     * Array.prototype.filter polyfill
-     *
-     * @param {Function} func
-     * @return {Array}
-     *
-     * @see http://goo.gl/T1KFnq
-     */
-    Array.prototype.filter = function (func) {
-      var t = Object(this), len = t.length >>> 0;
-
-      var res = [];
-      var thisArg = arguments.length >= 2 ? arguments[1] : void 0;
-      for (var i = 0; i < len; i++) {
-        if (i in t) {
-          var val = t[i];
-          if (func.call(thisArg, val, i, t)) {
-            res.push(val);
-          }
-        }
-      }
-  
-      return res;
-    };
-  }
-
-  var isSupportAmd = typeof define === 'function' && define.amd;
-
-  /**
-   * returns whether font is installed or not.
-   *
-   * @param {String} fontName
-   * @return {Boolean}
-   */
-  var isFontInstalled = function (fontName) {
-    var testFontName = fontName === 'Comic Sans MS' ? 'Courier New' : 'Comic Sans MS';
-    var $tester = $('<div>').css({
-      position: 'absolute',
-      left: '-9999px',
-      top: '-9999px',
-      fontSize: '200px'
-    }).text('mmmmmmmmmwwwwwww').appendTo(document.body);
-
-    var originalWidth = $tester.css('fontFamily', testFontName).width();
-    var width = $tester.css('fontFamily', fontName + ',' + testFontName).width();
-
-    $tester.remove();
-
-    return originalWidth !== width;
-  };
-
-  /**
-   * @class core.agent
-   *
-   * Object which check platform and agent
-   *
-   * @singleton
-   * @alternateClassName agent
-   */
-  var agent = {
-    /** @property {Boolean} [isMac=false] true if this agent is Mac  */
-    isMac: navigator.appVersion.indexOf('Mac') > -1,
-    /** @property {Boolean} [isMSIE=false] true if this agent is a Internet Explorer  */
-    isMSIE: navigator.userAgent.indexOf('MSIE') > -1 || navigator.userAgent.indexOf('Trident') > -1,
-    /** @property {Boolean} [isFF=false] true if this agent is a Firefox  */
-    isFF: navigator.userAgent.indexOf('Firefox') > -1,
-    /** @property {String} jqueryVersion current jQuery version string  */
-    jqueryVersion: parseFloat($.fn.jquery),
-    isSupportAmd: isSupportAmd,
-    hasCodeMirror: isSupportAmd ? require.specified('CodeMirror') : !!window.CodeMirror,
-    isFontInstalled: isFontInstalled,
-    isW3CRangeSupport: !!document.createRange
-  };
-
-  /**
-   * @class core.func
-   *
-   * func utils (for high-order func's arg)
-   *
-   * @singleton
-   * @alternateClassName func
-   */
-  var func = (function () {
-    var eq = function (itemA) {
-      return function (itemB) {
-        return itemA === itemB;
-      };
-    };
-
-    var eq2 = function (itemA, itemB) {
-      return itemA === itemB;
-    };
-
-    var peq2 = function (propName) {
-      return function (itemA, itemB) {
-        return itemA[propName] === itemB[propName];
-      };
-    };
-
-    var ok = function () {
-      return true;
-    };
-
-    var fail = function () {
-      return false;
-    };
-
-    var not = function (f) {
-      return function () {
-        return !f.apply(f, arguments);
-      };
-    };
-
-    var and = function (fA, fB) {
-      return function (item) {
-        return fA(item) && fB(item);
-      };
-    };
-
-    var self = function (a) {
-      return a;
-    };
-
-    var idCounter = 0;
-
-    /**
-     * generate a globally-unique id
-     *
-     * @param {String} [prefix]
-     */
-    var uniqueId = function (prefix) {
-      var id = ++idCounter + '';
-      return prefix ? prefix + id : id;
-    };
-
-    /**
-     * returns bnd (bounds) from rect
-     *
-     * - IE Compatability Issue: http://goo.gl/sRLOAo
-     * - Scroll Issue: http://goo.gl/sNjUc
-     *
-     * @param {Rect} rect
-     * @return {Object} bounds
-     * @return {Number} bounds.top
-     * @return {Number} bounds.left
-     * @return {Number} bounds.width
-     * @return {Number} bounds.height
-     */
-    var rect2bnd = function (rect) {
-      var $document = $(document);
-      return {
-        top: rect.top + $document.scrollTop(),
-        left: rect.left + $document.scrollLeft(),
-        width: rect.right - rect.left,
-        height: rect.bottom - rect.top
-      };
-    };
-
-    /**
-     * returns a copy of the object where the keys have become the values and the values the keys.
-     * @param {Object} obj
-     * @return {Object}
-     */
-    var invertObject = function (obj) {
-      var inverted = {};
-      for (var key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          inverted[obj[key]] = key;
-        }
-      }
-      return inverted;
-    };
-
-    /**
-     * @param {String} namespace
-     * @param {String} [prefix]
-     * @return {String}
-     */
-    var namespaceToCamel = function (namespace, prefix) {
-      prefix = prefix || '';
-      return prefix + namespace.split('.').map(function (name) {
-        return name.substring(0, 1).toUpperCase() + name.substring(1);
-      }).join('');
-    };
-
-    return {
-      eq: eq,
-      eq2: eq2,
-      peq2: peq2,
-      ok: ok,
-      fail: fail,
-      self: self,
-      not: not,
-      and: and,
-      uniqueId: uniqueId,
-      rect2bnd: rect2bnd,
-      invertObject: invertObject,
-      namespaceToCamel: namespaceToCamel
-    };
-  })();
-
-  /**
-   * @class core.list
-   *
-   * list utils
-   *
-   * @singleton
-   * @alternateClassName list
-   */
-  var list = (function () {
-    /**
-     * returns the first item of an array.
-     *
-     * @param {Array} array
-     */
-    var head = function (array) {
-      return array[0];
-    };
-
-    /**
-     * returns the last item of an array.
-     *
-     * @param {Array} array
-     */
-    var last = function (array) {
-      return array[array.length - 1];
-    };
-
-    /**
-     * returns everything but the last entry of the array.
-     *
-     * @param {Array} array
-     */
-    var initial = function (array) {
-      return array.slice(0, array.length - 1);
-    };
-
-    /**
-     * returns the rest of the items in an array.
-     *
-     * @param {Array} array
-     */
-    var tail = function (array) {
-      return array.slice(1);
-    };
-
-    /**
-     * returns item of array
-     */
-    var find = function (array, pred) {
-      for (var idx = 0, len = array.length; idx < len; idx ++) {
-        var item = array[idx];
-        if (pred(item)) {
-          return item;
-        }
-      }
-    };
-
-    /**
-     * returns true if all of the values in the array pass the predicate truth test.
-     */
-    var all = function (array, pred) {
-      for (var idx = 0, len = array.length; idx < len; idx ++) {
-        if (!pred(array[idx])) {
-          return false;
-        }
-      }
-      return true;
-    };
-
-    /**
-     * returns true if the value is present in the list.
-     */
-    var contains = function (array, item) {
-      return $.inArray(item, array) !== -1;
-    };
-
-    /**
-     * get sum from a list
-     *
-     * @param {Array} array - array
-     * @param {Function} fn - iterator
-     */
-    var sum = function (array, fn) {
-      fn = fn || func.self;
-      return array.reduce(function (memo, v) {
-        return memo + fn(v);
-      }, 0);
-    };
-  
-    /**
-     * returns a copy of the collection with array type.
-     * @param {Collection} collection - collection eg) node.childNodes, ...
-     */
-    var from = function (collection) {
-      var result = [], idx = -1, length = collection.length;
-      while (++idx < length) {
-        result[idx] = collection[idx];
-      }
-      return result;
-    };
-  
-    /**
-     * cluster elements by predicate function.
-     *
-     * @param {Array} array - array
-     * @param {Function} fn - predicate function for cluster rule
-     * @param {Array[]}
-     */
-    var clusterBy = function (array, fn) {
-      if (!array.length) { return []; }
-      var aTail = tail(array);
-      return aTail.reduce(function (memo, v) {
-        var aLast = last(memo);
-        if (fn(last(aLast), v)) {
-          aLast[aLast.length] = v;
-        } else {
-          memo[memo.length] = [v];
-        }
-        return memo;
-      }, [[head(array)]]);
-    };
-  
-    /**
-     * returns a copy of the array with all falsy values removed
-     *
-     * @param {Array} array - array
-     * @param {Function} fn - predicate function for cluster rule
-     */
-    var compact = function (array) {
-      var aResult = [];
-      for (var idx = 0, len = array.length; idx < len; idx ++) {
-        if (array[idx]) { aResult.push(array[idx]); }
-      }
-      return aResult;
-    };
-
-    /**
-     * produces a duplicate-free version of the array
-     *
-     * @param {Array} array
-     */
-    var unique = function (array) {
-      var results = [];
-
-      for (var idx = 0, len = array.length; idx < len; idx ++) {
-        if (!contains(results, array[idx])) {
-          results.push(array[idx]);
-        }
-      }
-
-      return results;
-    };
-
-    /**
-     * returns next item.
-     * @param {Array} array
-     */
-    var next = function (array, item) {
-      var idx = array.indexOf(item);
-      if (idx === -1) { return null; }
-
-      return array[idx + 1];
-    };
-
-    /**
-     * returns prev item.
-     * @param {Array} array
-     */
-    var prev = function (array, item) {
-      var idx = array.indexOf(item);
-      if (idx === -1) { return null; }
-
-      return array[idx - 1];
-    };
-
-  
-    return { head: head, last: last, initial: initial, tail: tail,
-             prev: prev, next: next, find: find, contains: contains,
-             all: all, sum: sum, from: from,
-             clusterBy: clusterBy, compact: compact, unique: unique };
-  })();
-
-
-  var NBSP_CHAR = String.fromCharCode(160);
-  var ZERO_WIDTH_NBSP_CHAR = '\ufeff';
-
-  /**
-   * @class core.dom
-   *
-   * Dom functions
-   *
-   * @singleton
-   * @alternateClassName dom
-   */
-  var dom = (function () {
-    /**
-     * @method isEditable
-     *
-     * returns whether node is `note-editable` or not.
-     *
-     * @param {Node} node
-     * @return {Boolean}
-     */
-    var isEditable = function (node) {
-      return node && $(node).hasClass('note-editable');
-    };
-
-    /**
-     * @method isControlSizing
-     *
-     * returns whether node is `note-control-sizing` or not.
-     *
-     * @param {Node} node
-     * @return {Boolean}
-     */
-    var isControlSizing = function (node) {
-      return node && $(node).hasClass('note-control-sizing');
-    };
-
-    /**
-     * @method  buildLayoutInfo
-     *
-     * build layoutInfo from $editor(.note-editor)
-     *
-     * @param {jQuery} $editor
-     * @return {Object}
-     * @return {Function} return.editor
-     * @return {Node} return.dropzone
-     * @return {Node} return.toolbar
-     * @return {Node} return.editable
-     * @return {Node} return.codable
-     * @return {Node} return.popover
-     * @return {Node} return.handle
-     * @return {Node} return.dialog
-     */
-    var buildLayoutInfo = function ($editor) {
-      var makeFinder;
-
-      // air mode
-      if ($editor.hasClass('note-air-editor')) {
-        var id = list.last($editor.attr('id').split('-'));
-        makeFinder = function (sIdPrefix) {
-          return function () { return $(sIdPrefix + id); };
-        };
-
-        return {
-          editor: function () { return $editor; },
-          holder : function () { return $editor.data('holder'); },
-          editable: function () { return $editor; },
-          popover: makeFinder('#note-popover-'),
-          handle: makeFinder('#note-handle-'),
-          dialog: makeFinder('#note-dialog-')
-        };
-
-        // frame mode
-      } else {
-        makeFinder = function (sClassName) {
-          return function () { return $editor.find(sClassName); };
-        };
-        return {
-          editor: function () { return $editor; },
-          holder : function () { return $editor.data('holder'); },
-          dropzone: makeFinder('.note-dropzone'),
-          toolbar: makeFinder('.note-toolbar'),
-          editable: makeFinder('.note-editable'),
-          codable: makeFinder('.note-codable'),
-          statusbar: makeFinder('.note-statusbar'),
-          popover: makeFinder('.note-popover'),
-          handle: makeFinder('.note-handle'),
-          dialog: makeFinder('.note-dialog')
-        };
-      }
-    };
-
-    /**
-     * returns makeLayoutInfo from editor's descendant node.
-     *
-     * @private
-     * @param {Node} descendant
-     * @return {Object}
-     */
-    var makeLayoutInfo = function (descendant) {
-      var $target = $(descendant).closest('.note-editor, .note-air-editor, .note-air-layout');
-
-      if (!$target.length) {
-        return null;
-      }
-
-      var $editor;
-      if ($target.is('.note-editor, .note-air-editor')) {
-        $editor = $target;
-      } else {
-        $editor = $('#note-editor-' + list.last($target.attr('id').split('-')));
-      }
-
-      return buildLayoutInfo($editor);
-    };
-
-    /**
-     * @method makePredByNodeName
-     *
-     * returns predicate which judge whether nodeName is same
-     *
-     * @param {String} nodeName
-     * @return {Function}
-     */
-    var makePredByNodeName = function (nodeName) {
-      nodeName = nodeName.toUpperCase();
-      return function (node) {
-        return node && node.nodeName.toUpperCase() === nodeName;
-      };
-    };
-
-    /**
-     * @method isText
-     *
-     *
-     *
-     * @param {Node} node
-     * @return {Boolean} true if node's type is text(3)
-     */
-    var isText = function (node) {
-      return node && node.nodeType === 3;
-    };
-
-    /**
-     * ex) br, col, embed, hr, img, input, ...
-     * @see http://www.w3.org/html/wg/drafts/html/master/syntax.html#void-elements
-     */
-    var isVoid = function (node) {
-      return node && /^BR|^IMG|^HR/.test(node.nodeName.toUpperCase());
-    };
-
-    var isPara = function (node) {
-      if (isEditable(node)) {
-        return false;
-      }
-
-      // Chrome(v31.0), FF(v25.0.1) use DIV for paragraph
-      return node && /^DIV|^P|^LI|^H[1-7]/.test(node.nodeName.toUpperCase());
-    };
-
-    var isLi = makePredByNodeName('LI');
-
-    var isPurePara = function (node) {
-      return isPara(node) && !isLi(node);
-    };
-
-    var isTable = makePredByNodeName('TABLE');
-
-    var isInline = function (node) {
-      return !isBodyContainer(node) &&
-             !isList(node) &&
-             !isPara(node) &&
-             !isTable(node) &&
-             !isBlockquote(node);
-    };
-
-    var isList = function (node) {
-      return node && /^UL|^OL/.test(node.nodeName.toUpperCase());
-    };
-
-    var isCell = function (node) {
-      return node && /^TD|^TH/.test(node.nodeName.toUpperCase());
-    };
-
-    var isBlockquote = makePredByNodeName('BLOCKQUOTE');
-
-    var isBodyContainer = function (node) {
-      return isCell(node) || isBlockquote(node) || isEditable(node);
-    };
-
-    var isAnchor = makePredByNodeName('A');
-
-    var isParaInline = function (node) {
-      return isInline(node) && !!ancestor(node, isPara);
-    };
-
-    var isBodyInline = function (node) {
-      return isInline(node) && !ancestor(node, isPara);
-    };
-
-    var isBody = makePredByNodeName('BODY');
-
-    /**
-     * returns whether nodeB is closest sibling of nodeA
-     *
-     * @param {Node} nodeA
-     * @param {Node} nodeB
-     * @return {Boolean}
-     */
-    var isClosestSibling = function (nodeA, nodeB) {
-      return nodeA.nextSibling === nodeB ||
-             nodeA.previousSibling === nodeB;
-    };
-
-    /**
-     * returns array of closest siblings with node
-     *
-     * @param {Node} node
-     * @param {function} [pred] - predicate function
-     * @return {Node[]}
-     */
-    var withClosestSiblings = function (node, pred) {
-      pred = pred || func.ok;
-
-      var siblings = [];
-      if (node.previousSibling && pred(node.previousSibling)) {
-        siblings.push(node.previousSibling);
-      }
-      siblings.push(node);
-      if (node.nextSibling && pred(node.nextSibling)) {
-        siblings.push(node.nextSibling);
-      }
-      return siblings;
-    };
-
-    /**
-     * blank HTML for cursor position
-     * - [workaround] for MSIE IE doesn't works with bogus br
-     */
-    var blankHTML = agent.isMSIE ? '&nbsp;' : '<br>';
-
-    /**
-     * @method nodeLength
-     *
-     * returns #text's text size or element's childNodes size
-     *
-     * @param {Node} node
-     */
-    var nodeLength = function (node) {
-      if (isText(node)) {
-        return node.nodeValue.length;
-      }
-
-      return node.childNodes.length;
-    };
-
-    /**
-     * returns whether node is empty or not.
-     *
-     * @param {Node} node
-     * @return {Boolean}
-     */
-    var isEmpty = function (node) {
-      var len = nodeLength(node);
-
-      if (len === 0) {
-        return true;
-      } else if (!dom.isText(node) && len === 1 && node.innerHTML === blankHTML) {
-        // ex) <p><br></p>, <span><br></span>
-        return true;
-      }
-
-      return false;
-    };
-
-    /**
-     * padding blankHTML if node is empty (for cursor position)
-     */
-    var paddingBlankHTML = function (node) {
-      if (!isVoid(node) && !nodeLength(node)) {
-        node.innerHTML = blankHTML;
-      }
-    };
-
-    /**
-     * find nearest ancestor predicate hit
-     *
-     * @param {Node} node
-     * @param {Function} pred - predicate function
-     */
-    var ancestor = function (node, pred) {
-      while (node) {
-        if (pred(node)) { return node; }
-        if (isEditable(node)) { break; }
-
-        node = node.parentNode;
-      }
-      return null;
-    };
-
-    /**
-     * find nearest ancestor only single child blood line and predicate hit
-     *
-     * @param {Node} node
-     * @param {Function} pred - predicate function
-     */
-    var singleChildAncestor = function (node, pred) {
-      node = node.parentNode;
-
-      while (node) {
-        if (nodeLength(node) !== 1) { break; }
-        if (pred(node)) { return node; }
-        if (isEditable(node)) { break; }
-
-        node = node.parentNode;
-      }
-      return null;
-    };
-
-    /**
-     * returns new array of ancestor nodes (until predicate hit).
-     *
-     * @param {Node} node
-     * @param {Function} [optional] pred - predicate function
-     */
-    var listAncestor = function (node, pred) {
-      pred = pred || func.fail;
-
-      var ancestors = [];
-      ancestor(node, function (el) {
-        if (!isEditable(el)) {
-          ancestors.push(el);
-        }
-
-        return pred(el);
-      });
-      return ancestors;
-    };
-
-    /**
-     * find farthest ancestor predicate hit
-     */
-    var lastAncestor = function (node, pred) {
-      var ancestors = listAncestor(node);
-      return list.last(ancestors.filter(pred));
-    };
-
-    /**
-     * returns common ancestor node between two nodes.
-     *
-     * @param {Node} nodeA
-     * @param {Node} nodeB
-     */
-    var commonAncestor = function (nodeA, nodeB) {
-      var ancestors = listAncestor(nodeA);
-      for (var n = nodeB; n; n = n.parentNode) {
-        if ($.inArray(n, ancestors) > -1) { return n; }
-      }
-      return null; // difference document area
-    };
-
-    /**
-     * listing all previous siblings (until predicate hit).
-     *
-     * @param {Node} node
-     * @param {Function} [optional] pred - predicate function
-     */
-    var listPrev = function (node, pred) {
-      pred = pred || func.fail;
-
-      var nodes = [];
-      while (node) {
-        if (pred(node)) { break; }
-        nodes.push(node);
-        node = node.previousSibling;
-      }
-      return nodes;
-    };
-
-    /**
-     * listing next siblings (until predicate hit).
-     *
-     * @param {Node} node
+var PMA_messages = new Array();
+PMA_messages['strNoDropDatabases'] = "\"DROP DATABASE\" statements are disabled.";
+PMA_messages['strConfirm'] = "Confirm";
+PMA_messages['strDoYouReally'] = "Do you really want to execute \"%s\"?";
+PMA_messages['strDropDatabaseStrongWarning'] = "You are about to DESTROY a complete database!";
+PMA_messages['strDropTableStrongWarning'] = "You are about to DESTROY a complete table!";
+PMA_messages['strTruncateTableStrongWarning'] = "You are about to TRUNCATE a complete table!";
+PMA_messages['strDeleteTrackingData'] = "Delete tracking data for this table";
+PMA_messages['strDeletingTrackingData'] = "Deleting tracking data";
+PMA_messages['strDroppingPrimaryKeyIndex'] = "Dropping Primary Key/Index";
+PMA_messages['strOperationTakesLongTime'] = "This operation could take a long time. Proceed anyway?";
+PMA_messages['strDropUserGroupWarning'] = "Do you really want to delete user group \"%s\"?";
+PMA_messages['strFormEmpty'] = "Missing value in the form!";
+PMA_messages['strEnterValidNumber'] = "Please enter a valid number";
+PMA_messages['strEnterValidLength'] = "Please enter a valid length";
+PMA_messages['strAddIndex'] = "Add Index";
+PMA_messages['strEditIndex'] = "Edit Index";
+PMA_messages['strAddToIndex'] = "Add %s column(s) to index";
+PMA_messages['strYValues'] = "Y Values";
+PMA_messages['strHostEmpty'] = "The host name is empty!";
+PMA_messages['strUserEmpty'] = "The user name is empty!";
+PMA_messages['strPasswordEmpty'] = "The password is empty!";
+PMA_messages['strPasswordNotSame'] = "The passwords aren\'t the same!";
+PMA_messages['strAddUser'] = "Add user";
+PMA_messages['strReloadingPrivileges'] = "Reloading Privileges";
+PMA_messages['strRemovingSelectedUsers'] = "Removing Selected Users";
+PMA_messages['strClose'] = "Close";
+PMA_messages['strOther'] = "Other";
+PMA_messages['strThousandsSeparator'] = ",";
+PMA_messages['strDecimalSeparator'] = ".";
+PMA_messages['strChartConnectionsTitle'] = "Connections / Processes";
+PMA_messages['strIncompatibleMonitorConfig'] = "Local monitor configuration incompatible";
+PMA_messages['strIncompatibleMonitorConfigDescription'] = "The chart arrangement configuration in your browsers local storage is not compatible anymore to the newer version of the monitor dialog. It is very likely that your current configuration will not work anymore. Please reset your configuration to default in the <i>Settings</i> menu.";
+PMA_messages['strQueryCacheEfficiency'] = "Query cache efficiency";
+PMA_messages['strQueryCacheUsage'] = "Query cache usage";
+PMA_messages['strQueryCacheUsed'] = "Query cache used";
+PMA_messages['strSystemCPUUsage'] = "System CPU Usage";
+PMA_messages['strSystemMemory'] = "System memory";
+PMA_messages['strSystemSwap'] = "System swap";
+PMA_messages['strAverageLoad'] = "Average load";
+PMA_messages['strTotalMemory'] = "Total memory";
+PMA_messages['strCachedMemory'] = "Cached memory";
+PMA_messages['strBufferedMemory'] = "Buffered memory";
+PMA_messages['strFreeMemory'] = "Free memory";
+PMA_messages['strUsedMemory'] = "Used memory";
+PMA_messages['strTotalSwap'] = "Total Swap";
+PMA_messages['strCachedSwap'] = "Cached Swap";
+PMA_messages['strUsedSwap'] = "Used Swap";
+PMA_messages['strFreeSwap'] = "Free Swap";
+PMA_messages['strBytesSent'] = "Bytes sent";
+PMA_messages['strBytesReceived'] = "Bytes received";
+PMA_messages['strConnections'] = "Connections";
+PMA_messages['strProcesses'] = "Processes";
+PMA_messages['strB'] = "B";
+PMA_messages['strKiB'] = "KiB";
+PMA_messages['strMiB'] = "MiB";
+PMA_messages['strGiB'] = "GiB";
+PMA_messages['strTiB'] = "TiB";
+PMA_messages['strPiB'] = "PiB";
+PMA_messages['strEiB'] = "EiB";
+PMA_messages['strTables'] = "%d table(s)";
+PMA_messages['strQuestions'] = "Questions";
+PMA_messages['strTraffic'] = "Traffic";
+PMA_messages['strSettings'] = "Settings";
+PMA_messages['strRemoveChart'] = "Remove chart";
+PMA_messages['strEditChart'] = "Edit title and labels";
+PMA_messages['strAddChart'] = "Add chart to grid";
+PMA_messages['strAddOneSeriesWarning'] = "Please add at least one variable to the series";
+PMA_messages['strNone'] = "None";
+PMA_messages['strResumeMonitor'] = "Resume monitor";
+PMA_messages['strPauseMonitor'] = "Pause monitor";
+PMA_messages['strBothLogOn'] = "general_log and slow_query_log are enabled.";
+PMA_messages['strGenLogOn'] = "general_log is enabled.";
+PMA_messages['strSlowLogOn'] = "slow_query_log is enabled.";
+PMA_messages['strBothLogOff'] = "slow_query_log and general_log are disabled.";
+PMA_messages['strLogOutNotTable'] = "log_output is not set to TABLE.";
+PMA_messages['strLogOutIsTable'] = "log_output is set to TABLE.";
+PMA_messages['strSmallerLongQueryTimeAdvice'] = "slow_query_log is enabled, but the server logs only queries that take longer than %d seconds. It is advisable to set this long_query_time 0-2 seconds, depending on your system.";
+PMA_messages['strLongQueryTimeSet'] = "long_query_time is set to %d second(s).";
+PMA_messages['strSettingsAppliedGlobal'] = "Following settings will be applied globally and reset to default on server restart:";
+PMA_messages['strSetLogOutput'] = "Set log_output to %s";
+PMA_messages['strEnableVar'] = "Enable %s";
+PMA_messages['strDisableVar'] = "Disable %s";
+PMA_messages['setSetLongQueryTime'] = "Set long_query_time to %ds";
+PMA_messages['strNoSuperUser'] = "You can\'t change these variables. Please log in as root or contact your database administrator.";
+PMA_messages['strChangeSettings'] = "Change settings";
+PMA_messages['strCurrentSettings'] = "Current settings";
+PMA_messages['strChartTitle'] = "Chart Title";
+PMA_messages['strDifferential'] = "Differential";
+PMA_messages['strDividedBy'] = "Divided by %s";
+PMA_messages['strUnit'] = "Unit";
+PMA_messages['strFromSlowLog'] = "From slow log";
+PMA_messages['strFromGeneralLog'] = "From general log";
+PMA_messages['strServerLogError'] = "The database name is not known for this query in the server\'s logs.";
+PMA_messages['strAnalysingLogsTitle'] = "Analysing logs";
+PMA_messages['strAnalysingLogs'] = "Analysing & loading logs. This may take a while.";
+PMA_messages['strCancelRequest'] = "Cancel request";
+PMA_messages['strCountColumnExplanation'] = "This column shows the amount of identical queries that are grouped together. However only the SQL query itself has been used as a grouping criteria, so the other attributes of queries, such as start time, may differ.";
+PMA_messages['strMoreCountColumnExplanation'] = "Since grouping of INSERTs queries has been selected, INSERT queries into the same table are also being grouped together, disregarding of the inserted data.";
+PMA_messages['strLogDataLoaded'] = "Log data loaded. Queries executed in this time span:";
+PMA_messages['strJumpToTable'] = "Jump to Log table";
+PMA_messages['strNoDataFoundTitle'] = "No data found";
+PMA_messages['strNoDataFound'] = "Log analysed, but no data found in this time span.";
+PMA_messages['strAnalyzing'] = "Analyzing‚Ä¶";
+PMA_messages['strExplainOutput'] = "Explain output";
+PMA_messages['strStatus'] = "Status";
+PMA_messages['strTime'] = "Time";
+PMA_messages['strTotalTime'] = "Total time:";
+PMA_messages['strProfilingResults'] = "Profiling results";
+PMA_messages['strTable'] = "Table";
+PMA_messages['strChart'] = "Chart";
+PMA_messages['strChartEdit'] = "Edit chart";
+PMA_messages['strSeries'] = "Series";
+PMA_messages['strFiltersForLogTable'] = "Log table filter options";
+PMA_messages['strFilter'] = "Filter";
+PMA_messages['strFilterByWordRegexp'] = "Filter queries by word/regexp:";
+PMA_messages['strIgnoreWhereAndGroup'] = "Group queries, ignoring variable data in WHERE clauses";
+PMA_messages['strSumRows'] = "Sum of grouped rows:";
+PMA_messages['strTotal'] = "Total:";
+PMA_messages['strLoadingLogs'] = "Loading logs";
+PMA_messages['strRefreshFailed'] = "Monitor refresh failed";
+PMA_messages['strInvalidResponseExplanation'] = "While requesting new chart data the server returned an invalid response. This is most likely because your session expired. Reloading the page and reentering your credentials should help.";
+PMA_messages['strReloadPage'] = "Reload page";
+PMA_messages['strAffectedRows'] = "Affected rows:";
+PMA_messages['strFailedParsingConfig'] = "Failed parsing config file. It doesn\'t seem to be valid JSON code.";
+PMA_messages['strFailedBuildingGrid'] = "Failed building chart grid with imported config. Resetting to default config‚Ä¶";
+PMA_messages['strImport'] = "Import";
+PMA_messages['strImportDialogTitle'] = "Import monitor configuration";
+PMA_messages['strImportDialogMessage'] = "Please select the file you want to import";
+PMA_messages['strAnalyzeQuery'] = "Analyse Query";
+PMA_messages['strAdvisorSystem'] = "Advisor system";
+PMA_messages['strPerformanceIssues'] = "Possible performance issues";
+PMA_messages['strIssuse'] = "Issue";
+PMA_messages['strRecommendation'] = "Recommendation";
+PMA_messages['strRuleDetails'] = "Rule details";
+PMA_messages['strJustification'] = "Justification";
+PMA_messages['strFormula'] = "Used variable / formula";
+PMA_messages['strTest'] = "Test";
+PMA_messages['strGo'] = "Go";
+PMA_messages['strCancel'] = "Cancel";
+PMA_messages['strLoading'] = "Loading‚Ä¶";
+PMA_messages['strAbortedRequest'] = "Request Aborted!!";
+PMA_messages['strProcessingRequest'] = "Processing Request";
+PMA_messages['strErrorProcessingRequest'] = "Error in Processing Request";
+PMA_messages['strErrorCode'] = "Error code: %s";
+PMA_messages['strErrorText'] = "Error text: %s";
+PMA_messages['strNoDatabasesSelected'] = "No databases selected.";
+PMA_messages['strDroppingColumn'] = "Dropping Column";
+PMA_messages['strAddingPrimaryKey'] = "Adding Primary Key";
+PMA_messages['strOK'] = "OK";
+PMA_messages['strDismiss'] = "Click to dismiss this notification";
+PMA_messages['strRenamingDatabases'] = "Renaming Databases";
+PMA_messages['strReloadDatabase'] = "Reload Database";
+PMA_messages['strCopyingDatabase'] = "Copying Database";
+PMA_messages['strChangingCharset'] = "Changing Charset";
+PMA_messages['strTableMustHaveAtleastOneColumn'] = "Table must have at least one column";
+PMA_messages['strYes'] = "Yes";
+PMA_messages['strNo'] = "No";
+PMA_messages['strInsertTable'] = "Insert Table";
+PMA_messages['strHideIndexes'] = "Hide indexes";
+PMA_messages['strShowIndexes'] = "Show indexes";
+PMA_messages['strForeignKeyCheck'] = "Foreign key check:";
+PMA_messages['strForeignKeyCheckEnabled'] = "(Enabled)";
+PMA_messages['strForeignKeyCheckDisabled'] = "(Disabled)";
+PMA_messages['strSearching'] = "Searching";
+PMA_messages['strHideSearchResults'] = "Hide search results";
+PMA_messages['strShowSearchResults'] = "Show search results";
+PMA_messages['strBrowsing'] = "Browsing";
+PMA_messages['strDeleting'] = "Deleting";
+PMA_messages['MissingReturn'] = "The definition of a stored function must contain a RETURN statement!";
+PMA_messages['enum_editor'] = "ENUM/SET editor";
+PMA_messages['enum_columnVals'] = "Values for column %s";
+PMA_messages['enum_newColumnVals'] = "Values for a new column";
+PMA_messages['enum_hint'] = "Enter each value in a separate field";
+PMA_messages['enum_addValue'] = "Add %d value(s)";
+PMA_messages['strImportCSV'] = "Note: If the file contains multiple tables, they will be combined into one.";
+PMA_messages['strHideQueryBox'] = "Hide query box";
+PMA_messages['strShowQueryBox'] = "Show query box";
+PMA_messages['strEdit'] = "Edit";
+PMA_messages['strNoRowSelected'] = "No rows selected";
+PMA_messages['strChangeTbl'] = "Change";
+PMA_messages['strQueryExecutionTime'] = "Query execution time";
+PMA_messages['strNotValidRowNumber'] = "%d is not valid row number.";
+PMA_messages['strSave'] = "Save";
+PMA_messages['strHideSearchCriteria'] = "Hide search criteria";
+PMA_messages['strShowSearchCriteria'] = "Show search criteria";
+PMA_messages['strHideFindNReplaceCriteria'] = "Hide find and replace criteria";
+PMA_messages['strShowFindNReplaceCriteria'] = "Show find and replace criteria";
+PMA_messages['strZoomSearch'] = "Zoom Search";
+PMA_messages['strDisplayHelp'] = "<ul><li>Each point represents a data row.</li><li>Hovering over a point will show its label.</li><li>To zoom in, select a section of the plot with the mouse.</li><li>Click reset zoom button to come back to original state.</li><li>Click a data point to view and possibly edit the data row.</li><li>The plot can be resized by dragging it along the bottom right corner.</li></ul>";
+PMA_messages['strInputNull'] = "<strong>Select two columns</strong>";
+PMA_messages['strSameInputs'] = "<strong>Select two different columns</strong>";
+PMA_messages['strQueryResults'] = "Query results";
+PMA_messages['strDataPointContent'] = "Data point content";
+PMA_messages['strIgnore'] = "Ignore";
+PMA_messages['strCopy'] = "Copy";
+PMA_messages['strX'] = "X";
+PMA_messages['strY'] = "Y";
+PMA_messages['strPoint'] = "Point";
+PMA_messages['strPointN'] = "Point %d";
+PMA_messages['strLineString'] = "Linestring";
+PMA_messages['strPolygon'] = "Polygon";
+PMA_messages['strGeometry'] = "Geometry";
+PMA_messages['strInnerRing'] = "Inner Ring";
+PMA_messages['strOuterRing'] = "Outer Ring";
+PMA_messages['strAddPoint'] = "Add a point";
+PMA_messages['strAddInnerRing'] = "Add an inner ring";
+PMA_messages['strAddPolygon'] = "Add a polygon";
+PMA_messages['strAddColumns'] = "Add columns";
+PMA_messages['strSelectReferencedKey'] = "Select referenced key";
+PMA_messages['strSelectForeignKey'] = "Select Foreign Key";
+PMA_messages['strPleaseSelectPrimaryOrUniqueKey'] = "Please select the primary key or a unique key";
+PMA_messages['strChangeDisplay'] = "Choose column to display";
+PMA_messages['strLeavingDesigner'] = "You haven\'t saved the changes in the layout. They will be lost if you don\'t save them. Do you want to continue?";
+PMA_messages['strAddOption'] = "Add an option for column ";
+PMA_messages['strObjectsCreated'] = "%d object(s) created";
+PMA_messages['strCellEditHint'] = "Press escape to cancel editing";
+PMA_messages['strSaveCellWarning'] = "You have edited some data and they have not been saved. Are you sure you want to leave this page before saving the data?";
+PMA_messages['strColOrderHint'] = "Drag to reorder";
+PMA_messages['strSortHint'] = "Click to sort";
+PMA_messages['strColMarkHint'] = "Click to mark/unmark";
+PMA_messages['strColNameCopyHint'] = "Double-click to copy column name";
+PMA_messages['strColVisibHint'] = "Click the drop-down arrow<br />to toggle column\'s visibility";
+PMA_messages['strShowAllCol'] = "Show all";
+PMA_messages['strAlertNonUnique'] = "This table does not contain a unique column. Features related to the grid edit, checkbox, Edit, Copy and Delete links may not work after saving.";
+PMA_messages['strGridEditFeatureHint'] = "You can also edit most values<br />by double-clicking directly on them.";
+PMA_messages['strGoToLink'] = "Go to link";
+PMA_messages['strColNameCopyTitle'] = "Copy column name";
+PMA_messages['strColNameCopyText'] = "Right-click the column name to copy it to your clipboard.";
+PMA_messages['strShowDataRowLink'] = "Show data row(s)";
+PMA_messages['strGeneratePassword'] = "Generate password";
+PMA_messages['strGenerate'] = "Generate";
+PMA_messages['strChangePassword'] = "Change Password";
+PMA_messages['strMore'] = "More";
+PMA_messages['strShowPanel'] = "Show Panel";
+PMA_messages['strHidePanel'] = "Hide Panel";
+PMA_messages['strUnhideNavItem'] = "Show hidden navigation tree items";
+PMA_messages['strInvalidPage'] = "The requested page was not found in the history, it may have expired.";
+PMA_messages['strNewerVersion'] = "A newer version of phpMyAdmin is available and you should consider upgrading. The newest version is %s, released on %s.";
+PMA_messages['strLatestAvailable'] = ", latest stable version:";
+PMA_messages['strUpToDate'] = "up to date";
+PMA_messages['strCreateView'] = "Create view";
+PMA_messages['strSendErrorReport'] = "Send Error Report";
+PMA_messages['strSubmitErrorReport'] = "Submit Error Report";
+PMA_messages['strErrorOccurred'] = "A fatal JavaScript error has occurred. Would you like to send an error report?";
+PMA_messages['strChangeReportSettings'] = "Change Report Settings";
+PMA_messages['strShowReportDetails'] = "Show Report Details";
+PMA_messages['strTimeOutError'] = "Your export is incomplete, due to a low execution time limit at the PHP level";
+var themeCalendarImage = './themes/pmahomme/img/b_calendar.png';
+var pmaThemeImage = './themes/pmahomme/img/';
+var pmaversion = '4.1.14';
+var mysql_doc_template = './url.php?url=http%3A%2F%2Fdev.mysql.com%2Fdoc%2Frefman%2F5.5%2Fen%2F%25s.html&amp;server=0&amp;token=662b4397b7f84d13d18237e5d9b610b9';
+if ($.datepicker) {
+$.datepicker.regional['']['closeText'] = "Done";
+$.datepicker.regional['']['prevText'] = "Prev";
+$.datepicker.regional['']['nextText'] = "Next";
+$.datepicker.regional['']['currentText'] = "Today";
+$.datepicker.regional['']['monthNames'] = ["January","February","March","April","May","June","July","August","September","October","November","December",];
+$.datepicker.regional['']['monthNamesShort'] = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec",];
+$.datepicker.regional['']['dayNames'] = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday",];
+$.datepicker.regional['']['dayNamesShort'] = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat",];
+$.datepicker.regional['']['dayNamesMin'] = ["Su","Mo","Tu","We","Th","Fr","Sa",];
+$.datepicker.regional['']['weekHeader'] = "Wk";
+$.datepicker.regional['']['showMonthAfterYear'] = false;
+$.datepicker.regional['']['yearSuffix'] = "";
+$.extend($.datepicker._defaults, $.datepicker.regional['']);
+} /* if ($.datepicker) */
+
+if ($.timepicker) {
+$.timepicker.regional['']['timeText'] = "Time";
+$.timepicker.regional['']['hourText'] = "Hour";
+$.timepicker.regional['']['minuteText'] = "Minute";
+$.timepicker.regional['']['secondText'] = "Second";
+$.extend($.timepicker._defaults, $.timepicker.regional['']);
+} /* if ($.timepicker) */
+                                                                                                                                                                      Ä                    T R A N S P ~ 1 . T M P s    «ƒ   Æƒ   Æƒ   ∏          ê             (   ( ê `   ‡          op      &à     ê Ä     òÂ     )cÌ~:{–’aÖ˚iç–˜è^jç–£ÏÑ˚iç– Ä                    T r a n s p o r t S e c u r i t y ~ R F 1 a a 5 1 1 4 . T M P ‰ƒ   «ƒ   «ƒ   @          ê             (   (          	"      	"     FILE0  ‚√     8  Úƒ   ‰ƒ   ‰ƒ   0          ê             (  (  ¯                ™˝     &     ˛ƒ   Úƒ 3ø                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                node
      * @param {Function} [pred] - predicate function
      */
     var listNext = function (node, pred) {
@@ -1296,5595 +750,1135 @@
       });
 
       // if container is point.node, find pivot with point.offset
-      if (!pivot && container === point.node) {
-        pivot = point.node.childNodes[point.offset];
-      }
-
-      return {
-        rightNode: pivot,
-        container: container
-      };
-    };
-
-    var create = function (nodeName) {
-      return document.createElement(nodeName);
-    };
-
-    var createText = function (text) {
-      return document.createTextNode(text);
-    };
-
-    /**
-     * @method remove
-     *
-     * remove node, (isRemoveChild: remove child or not)
-     *
-     * @param {Node} node
-     * @param {Boolean} isRemoveChild
-     */
-    var remove = function (node, isRemoveChild) {
-      if (!node || !node.parentNode) { return; }
-      if (node.removeNode) { return node.removeNode(isRemoveChild); }
-
-      var parent = node.parentNode;
-      if (!isRemoveChild) {
-        var nodes = [];
-        var i, len;
-        for (i = 0, len = node.childNodes.length; i < len; i++) {
-          nodes.push(node.childNodes[i]);
-        }
-
-        for (i = 0, len = nodes.length; i < len; i++) {
-          parent.insertBefore(nodes[i], node);
-        }
-      }
-
-      parent.removeChild(node);
-    };
-
-    /**
-     * @method removeWhile
-     *
-     * @param {Node} node
-     * @param {Function} pred
-     */
-    var removeWhile = function (node, pred) {
-      while (node) {
-        if (isEditable(node) || !pred(node)) {
-          break;
-        }
-
-        var parent = node.parentNode;
-        remove(node);
-        node = parent;
-      }
-    };
-
-    /**
-     * @method replace
-     *
-     * replace node with provided nodeName
-     *
-     * @param {Node} node
-     * @param {String} nodeName
-     * @return {Node} - new node
-     */
-    var replace = function (node, nodeName) {
-      if (node.nodeName.toUpperCase() === nodeName.toUpperCase()) {
-        return node;
-      }
-
-      var newNode = create(nodeName);
-
-      if (node.style.cssText) {
-        newNode.style.cssText = node.style.cssText;
-      }
-
-      appendChildNodes(newNode, list.from(node.childNodes));
-      insertAfter(newNode, node);
-      remove(node);
-
-      return newNode;
-    };
-
-    var isTextarea = makePredByNodeName('TEXTAREA');
-
-    /**
-     * @param {jQuery} $node
-     * @param {Boolean} [stripLinebreaks] - default: false
-     */
-    var value = function ($node, stripLinebreaks) {
-      var val = isTextarea($node[0]) ? $node.val() : $node.html();
-      if (stripLinebreaks) {
-        return val.replace(/[\n\r]/g, '');
-      }
-      return val;
-    };
-
-    /**
-     * @method html
-     *
-     * get the HTML contents of node
-     *
-     * @param {jQuery} $node
-     * @param {Boolean} [isNewlineOnBlock]
-     */
-    var html = function ($node, isNewlineOnBlock) {
-      var markup = value($node);
-
-      if (isNewlineOnBlock) {
-        var regexTag = /<(\/?)(\b(?!!)[^>\s]*)(.*?)(\s*\/?>)/g;
-        markup = markup.replace(regexTag, function (match, endSlash, name) {
-          name = name.toUpperCase();
-          var isEndOfInlineContainer = /^DIV|^TD|^TH|^P|^LI|^H[1-7]/.test(name) &&
-                                       !!endSlash;
-          var isBlockNode = /^BLOCKQUOTE|^TABLE|^TBODY|^TR|^HR|^UL|^OL/.test(name);
-
-          return match + ((isEndOfInlineContainer || isBlockNode) ? '\n' : '');
-        });
-        markup = $.trim(markup);
-      }
-
-      return markup;
-    };
-
-    return {
-      /** @property {String} NBSP_CHAR */
-      NBSP_CHAR: NBSP_CHAR,
-      /** @property {String} ZERO_WIDTH_NBSP_CHAR */
-      ZERO_WIDTH_NBSP_CHAR: ZERO_WIDTH_NBSP_CHAR,
-      /** @property {String} blank */
-      blank: blankHTML,
-      /** @property {String} emptyPara */
-      emptyPara: '<p>' + blankHTML + '</p>',
-      makePredByNodeName: makePredByNodeName,
-      isEditable: isEditable,
-      isControlSizing: isControlSizing,
-      buildLayoutInfo: buildLayoutInfo,
-      makeLayoutInfo: makeLayoutInfo,
-      isText: isText,
-      isVoid: isVoid,
-      isPara: isPara,
-      isPurePara: isPurePara,
-      isInline: isInline,
-      isBlock: func.not(isInline),
-      isBodyInline: isBodyInline,
-      isBody: isBody,
-      isParaInline: isParaInline,
-      isList: isList,
-      isTable: isTable,
-      isCell: isCell,
-      isBlockquote: isBlockquote,
-      isBodyContainer: isBodyContainer,
-      isAnchor: isAnchor,
-      isDiv: makePredByNodeName('DIV'),
-      isLi: isLi,
-      isBR: makePredByNodeName('BR'),
-      isSpan: makePredByNodeName('SPAN'),
-      isB: makePredByNodeName('B'),
-      isU: makePredByNodeName('U'),
-      isS: makePredByNodeName('S'),
-      isI: makePredByNodeName('I'),
-      isImg: makePredByNodeName('IMG'),
-      isTextarea: isTextarea,
-      isEmpty: isEmpty,
-      isEmptyAnchor: func.and(isAnchor, isEmpty),
-      isClosestSibling: isClosestSibling,
-      withClosestSiblings: withClosestSiblings,
-      nodeLength: nodeLength,
-      isLeftEdgePoint: isLeftEdgePoint,
-      isRightEdgePoint: isRightEdgePoint,
-      isEdgePoint: isEdgePoint,
-      isLeftEdgeOf: isLeftEdgeOf,
-      isRightEdgeOf: isRightEdgeOf,
-      prevPoint: prevPoint,
-      nextPoint: nextPoint,
-      isSamePoint: isSamePoint,
-      isVisiblePoint: isVisiblePoint,
-      prevPointUntil: prevPointUntil,
-      nextPointUntil: nextPointUntil,
-      isCharPoint: isCharPoint,
-      walkPoint: walkPoint,
-      ancestor: ancestor,
-      singleChildAncestor: singleChildAncestor,
-      listAncestor: listAncestor,
-      lastAncestor: lastAncestor,
-      listNext: listNext,
-      listPrev: listPrev,
-      listDescendant: listDescendant,
-      commonAncestor: commonAncestor,
-      wrap: wrap,
-      insertAfter: insertAfter,
-      appendChildNodes: appendChildNodes,
-      position: position,
-      hasChildren: hasChildren,
-      makeOffsetPath: makeOffsetPath,
-      fromOffsetPath: fromOffsetPath,
-      splitTree: splitTree,
-      splitPoint: splitPoint,
-      create: create,
-      createText: createText,
-      remove: remove,
-      removeWhile: removeWhile,
-      replace: replace,
-      html: html,
-      value: value
-    };
-  })();
-
-
-  var range = (function () {
-
-    /**
-     * return boundaryPoint from TextRange, inspired by Andy Na's HuskyRange.js
-     *
-     * @param {TextRange} textRange
-     * @param {Boolean} isStart
-     * @return {BoundaryPoint}
-     *
-     * @see http://msdn.microsoft.com/en-us/library/ie/ms535872(v=vs.85).aspx
-     */
-    var textRangeToPoint = function (textRange, isStart) {
-      var container = textRange.parentElement(), offset;
-  
-      var tester = document.body.createTextRange(), prevContainer;
-      var childNodes = list.from(container.childNodes);
-      for (offset = 0; offset < childNodes.length; offset++) {
-        if (dom.isText(childNodes[offset])) {
-          continue;
-        }
-        tester.moveToElementText(childNodes[offset]);
-        if (tester.compareEndPoints('StartToStart', textRange) >= 0) {
-          break;
-        }
-        prevContainer = childNodes[offset];
-      }
-  
-      if (offset !== 0 && dom.isText(childNodes[offset - 1])) {
-        var textRangeStart = document.body.createTextRange(), curTextNode = null;
-        textRangeStart.moveToElementText(prevContainer || container);
-        textRangeStart.collapse(!prevContainer);
-        curTextNode = prevContainer ? prevContainer.nextSibling : container.firstChild;
-  
-        var pointTester = textRange.duplicate();
-        pointTester.setEndPoint('StartToStart', textRangeStart);
-        var textCount = pointTester.text.replace(/[\r\n]/g, '').length;
-  
-        while (textCount > curTextNode.nodeValue.length && curTextNode.nextSibling) {
-          textCount -= curTextNode.nodeValue.length;
-          curTextNode = curTextNode.nextSibling;
-        }
-  
-        /* jshint ignore:start */
-        var dummy = curTextNode.nodeValue; // enforce IE to re-reference curTextNode, hack
-        /* jshint ignore:end */
-  
-        if (isStart && curTextNode.nextSibling && dom.isText(curTextNode.nextSibling) &&
-            textCount === curTextNode.nodeValue.length) {
-          textCount -= curTextNode.nodeValue.length;
-          curTextNode = curTextNode.nextSibling;
-        }
-  
-        container = curTextNode;
-        offset = textCount;
-      }
-  
-      return {
-        cont: container,
-        offset: offset
-      };
-    };
-    
-    /**
-     * return TextRange from boundary point (inspired by google closure-library)
-     * @param {BoundaryPoint} point
-     * @return {TextRange}
-     */
-    var pointToTextRange = function (point) {
-      var textRangeInfo = function (container, offset) {
-        var node, isCollapseToStart;
-  
-        if (dom.isText(container)) {
-          var prevTextNodes = dom.listPrev(container, func.not(dom.isText));
-          var prevContainer = list.last(prevTextNodes).previousSibling;
-          node =  prevContainer || container.parentNode;
-          offset += list.sum(list.tail(prevTextNodes), dom.nodeLength);
-          isCollapseToStart = !prevContainer;
-        } else {
-          node = container.childNodes[offset] || container;
-          if (dom.isText(node)) {
-            return textRangeInfo(node, 0);
-          }
-  
-          offset = 0;
-          isCollapseToStart = false;
-        }
-  
-        return {
-          node: node,
-          collapseToStart: isCollapseToStart,
-          offset: offset
-        };
-      };
-  
-      var textRange = document.body.createTextRange();
-      var info = textRangeInfo(point.node, point.offset);
-  
-      textRange.moveToElementText(info.node);
-      textRange.collapse(info.collapseToStart);
-      textRange.moveStart('character', info.offset);
-      return textRange;
-    };
-    
-    /**
-     * Wrapped Range
-     *
-     * @constructor
-     * @param {Node} sc - start container
-     * @param {Number} so - start offset
-     * @param {Node} ec - end container
-     * @param {Number} eo - end offset
-     */
-    var WrappedRange = function (sc, so, ec, eo) {
-      this.sc = sc;
-      this.so = so;
-      this.ec = ec;
-      this.eo = eo;
-  
-      // nativeRange: get nativeRange from sc, so, ec, eo
-      var nativeRange = function () {
-        if (agent.isW3CRangeSupport) {
-          var w3cRange = document.createRange();
-          w3cRange.setStart(sc, so);
-          w3cRange.setEnd(ec, eo);
-
-          return w3cRange;
-        } else {
-          var textRange = pointToTextRange({
-            node: sc,
-            offset: so
-          });
-
-          textRange.setEndPoint('EndToEnd', pointToTextRange({
-            node: ec,
-            offset: eo
-          }));
-
-          return textRange;
-        }
-      };
-
-      this.getPoints = function () {
-        return {
-          sc: sc,
-          so: so,
-          ec: ec,
-          eo: eo
-        };
-      };
-
-      this.getStartPoint = function () {
-        return {
-          node: sc,
-          offset: so
-        };
-      };
-
-      this.getEndPoint = function () {
-        return {
-          node: ec,
-          offset: eo
-        };
-      };
-
-      /**
-       * select update visible range
-       */
-      this.select = function () {
-        var nativeRng = nativeRange();
-        if (agent.isW3CRangeSupport) {
-          var selection = document.getSelection();
-          if (selection.rangeCount > 0) {
-            selection.removeAllRanges();
-          }
-          selection.addRange(nativeRng);
-        } else {
-          nativeRng.select();
-        }
-        
-        return this;
-      };
-
-      /**
-       * @return {WrappedRange}
-       */
-      this.normalize = function () {
-
-        /**
-         * @param {BoundaryPoint} point
-         * @return {BoundaryPoint}
-         */
-        var getVisiblePoint = function (point) {
-          if (!dom.isVisiblePoint(point)) {
-            if (dom.isLeftEdgePoint(point)) {
-              point = dom.nextPointUntil(point, dom.isVisiblePoint);
-            } else {
-              point = dom.prevPointUntil(point, dom.isVisiblePoint);
-            }
-          }
-          return point;
-        };
-
-        var startPoint = getVisiblePoint(this.getStartPoint());
-        var endPoint = getVisiblePoint(this.getEndPoint());
-
-        return new WrappedRange(
-          startPoint.node,
-          startPoint.offset,
-          endPoint.node,
-          endPoint.offset
-        );
-      };
-
-      /**
-       * returns matched nodes on range
-       *
-       * @param {Function} [pred] - predicate function
-       * @param {Object} [options]
-       * @param {Boolean} [options.includeAncestor]
-       * @param {Boolean} [options.fullyContains]
-       * @return {Node[]}
-       */
-      this.nodes = function (pred, options) {
-        pred = pred || func.ok;
-
-        var includeAncestor = options && options.includeAncestor;
-        var fullyContains = options && options.fullyContains;
-
-        // TODO compare points and sort
-        var startPoint = this.getStartPoint();
-        var endPoint = this.getEndPoint();
-
-        var nodes = [];
-        var leftEdgeNodes = [];
-
-        dom.walkPoint(startPoint, endPoint, function (point) {
-          if (dom.isEditable(point.node)) {
-            return;
-          }
-
-          var node;
-          if (fullyContains) {
-            if (dom.isLeftEdgePoint(point)) {
-              leftEdgeNodes.push(point.node);
-            }
-            if (dom.isRightEdgePoint(point) && list.contains(leftEdgeNodes, point.node)) {
-              node = point.node;
-            }
-          } else if (includeAncestor) {
-            node = dom.ancestor(point.node, pred);
-          } else {
-            node = point.node;
-          }
-
-          if (node && pred(node)) {
-            nodes.push(node);
-          }
-        }, true);
-
-        return list.unique(nodes);
-      };
-
-      /**
-       * returns commonAncestor of range
-       * @return {Element} - commonAncestor
-       */
-      this.commonAncestor = function () {
-        return dom.commonAncestor(sc, ec);
-      };
-
-      /**
-       * returns expanded range by pred
-       *
-       * @param {Function} pred - predicate function
-       * @return {WrappedRange}
-       */
-      this.expand = function (pred) {
-        var startAncestor = dom.ancestor(sc, pred);
-        var endAncestor = dom.ancestor(ec, pred);
-
-        if (!startAncestor && !endAncestor) {
-          return new WrappedRange(sc, so, ec, eo);
-        }
-
-        var boundaryPoints = this.getPoints();
-
-        if (startAncestor) {
-          boundaryPoints.sc = startAncestor;
-          boundaryPoints.so = 0;
-        }
-
-        if (endAncestor) {
-          boundaryPoints.ec = endAncestor;
-          boundaryPoints.eo = dom.nodeLength(endAncestor);
-        }
-
-        return new WrappedRange(
-          boundaryPoints.sc,
-          boundaryPoints.so,
-          boundaryPoints.ec,
-          boundaryPoints.eo
-        );
-      };
-
-      /**
-       * @param {Boolean} isCollapseToStart
-       * @return {WrappedRange}
-       */
-      this.collapse = function (isCollapseToStart) {
-        if (isCollapseToStart) {
-          return new WrappedRange(sc, so, sc, so);
-        } else {
-          return new WrappedRange(ec, eo, ec, eo);
-        }
-      };
-
-      /**
-       * splitText on range
-       */
-      this.splitText = function () {
-        var isSameContainer = sc === ec;
-        var boundaryPoints = this.getPoints();
-
-        if (dom.isText(ec) && !dom.isEdgePoint(this.getEndPoint())) {
-          ec.splitText(eo);
-        }
-
-        if (dom.isText(sc) && !dom.isEdgePoint(this.getStartPoint())) {
-          boundaryPoints.sc = sc.splitText(so);
-          boundaryPoints.so = 0;
-
-          if (isSameContainer) {
-            boundaryPoints.ec = boundaryPoints.sc;
-            boundaryPoints.eo = eo - so;
-          }
-        }
-
-        return new WrappedRange(
-          boundaryPoints.sc,
-          boundaryPoints.so,
-          boundaryPoints.ec,
-          boundaryPoints.eo
-        );
-      };
-
-      /**
-       * delete contents on range
-       * @return {WrappedRange}
-       */
-      this.deleteContents = function () {
-        if (this.isCollapsed()) {
-          return this;
-        }
-
-        var rng = this.splitText();
-        var nodes = rng.nodes(null, {
-          fullyContains: true
-        });
-
-        // find new cursor point
-        var point = dom.prevPointUntil(rng.getStartPoint(), function (point) {
-          return !list.contains(nodes, point.node);
-        });
-
-        var emptyParents = [];
-        $.each(nodes, function (idx, node) {
-          // find empty parents
-          var parent = node.parentNode;
-          if (point.node !== parent && dom.nodeLength(parent) === 1) {
-            emptyParents.push(parent);
-          }
-          dom.remove(node, false);
-        });
-
-        // remove empty parents
-        $.each(emptyParents, function (idx, node) {
-          dom.remove(node, false);
-        });
-
-        return new WrappedRange(
-          point.node,
-          point.offset,
-          point.node,
-          point.offset
-        ).normalize();
-      };
-      
-      /**
-       * makeIsOn: return isOn(pred) function
-       */
-      var makeIsOn = function (pred) {
-        return function () {
-          var ancestor = dom.ancestor(sc, pred);
-          return !!ancestor && (ancestor === dom.ancestor(ec, pred));
-        };
-      };
-  
-      // isOnEditable: judge whether range is on editable or not
-      this.isOnEditable = makeIsOn(dom.isEditable);
-      // isOnList: judge whether range is on list node or not
-      this.isOnList = makeIsOn(dom.isList);
-      // isOnAnchor: judge whether range is on anchor node or not
-      this.isOnAnchor = makeIsOn(dom.isAnchor);
-      // isOnAnchor: judge whether range is on cell node or not
-      this.isOnCell = makeIsOn(dom.isCell);
-
-      /**
-       * @param {Function} pred
-       * @return {Boolean}
-       */
-      this.isLeftEdgeOf = function (pred) {
-        if (!dom.isLeftEdgePoint(this.getStartPoint())) {
-          return false;
-        }
-
-        var node = dom.ancestor(this.sc, pred);
-        return node && dom.isLeftEdgeOf(this.sc, node);
-      };
-
-      /**
-       * returns whether range was collapsed or not
-       */
-      this.isCollapsed = function () {
-        return sc === ec && so === eo;
-      };
-
-      /**
-       * wrap inline nodes which children of body with paragraph
-       *
-       * @return {WrappedRange}
-       */
-      this.wrapBodyInlineWithPara = function () {
-        if (dom.isBodyContainer(sc) && dom.isEmpty(sc)) {
-          sc.innerHTML = dom.emptyPara;
-          return new WrappedRange(sc.firstChild, 0, sc.firstChild, 0);
-        }
-
-        if (dom.isParaInline(sc) || dom.isPara(sc)) {
-          return this.normalize();
-        }
-
-        // find inline top ancestor
-        var topAncestor;
-        if (dom.isInline(sc)) {
-          var ancestors = dom.listAncestor(sc, func.not(dom.isInline));
-          topAncestor = list.last(ancestors);
-          if (!dom.isInline(topAncestor)) {
-            topAncestor = ancestors[ancestors.length - 2] || sc.childNodes[so];
-          }
-        } else {
-          topAncestor = sc.childNodes[so > 0 ? so - 1 : 0];
-        }
-
-        // siblings not in paragraph
-        var inlineSiblings = dom.listPrev(topAncestor, dom.isParaInline).reverse();
-        inlineSiblings = inlineSiblings.concat(dom.listNext(topAncestor.nextSibling, dom.isParaInline));
-
-        // wrap with paragraph
-        if (inlineSiblings.length) {
-          var para = dom.wrap(list.head(inlineSiblings), 'p');
-          dom.appendChildNodes(para, list.tail(inlineSiblings));
-        }
-
-        return this.normalize();
-      };
-
-      /**
-       * insert node at current cursor
-       *
-       * @param {Node} node
-       * @return {Node}
-       */
-      this.insertNode = function (node) {
-        var rng = this.wrapBodyInlineWithPara().deleteContents();
-        var info = dom.splitPoint(rng.getStartPoint(), dom.isInline(node));
-
-        if (info.rightNode) {
-          info.rightNode.parentNode.insertBefore(node, info.rightNode);
-        } else {
-          info.container.appendChild(node);
-        }
-
-        return node;
-      };
-
-      /**
-       * insert html at current cursor
-       */
-      this.pasteHTML = function (markup) {
-        var self = this;
-        var contentsContainer = $('<div></div>').html(markup)[0];
-        var childNodes = list.from(contentsContainer.childNodes);
-
-        this.wrapBodyInlineWithPara().deleteContents();
-
-        return $.map(childNodes.reverse(), function (childNode) {
-          return self.insertNode(childNode);
-        }).reverse();
-      };
-  
-      /**
-       * returns text in range
-       *
-       * @return {String}
-       */
-      this.toString = function () {
-        var nativeRng = nativeRange();
-        return agent.isW3CRangeSupport ? nativeRng.toString() : nativeRng.text;
-      };
-
-      /**
-       * returns range for word before cursor
-       *
-       * @param {Boolean} [findAfter] - find after cursor, default: false
-       * @return {WrappedRange}
-       */
-      this.getWordRange = function (findAfter) {
-        var endPoint = this.getEndPoint();
-
-        if (!dom.isCharPoint(endPoint)) {
-          return this;
-        }
-
-        var startPoint = dom.prevPointUntil(endPoint, function (point) {
-          return !dom.isCharPoint(point);
-        });
-
-        if (findAfter) {
-          endPoint = dom.nextPointUntil(endPoint, function (point) {
-            return !dom.isCharPoint(point);
-          });
-        }
-
-        return new WrappedRange(
-          startPoint.node,
-          startPoint.offset,
-          endPoint.node,
-          endPoint.offset
-        );
-      };
-  
-      /**
-       * create offsetPath bookmark
-       *
-       * @param {Node} editable
-       */
-      this.bookmark = function (editable) {
-        return {
-          s: {
-            path: dom.makeOffsetPath(editable, sc),
-            offset: so
-          },
-          e: {
-            path: dom.makeOffsetPath(editable, ec),
-            offset: eo
-          }
-        };
-      };
-
-      /**
-       * create offsetPath bookmark base on paragraph
-       *
-       * @param {Node[]} paras
-       */
-      this.paraBookmark = function (paras) {
-        return {
-          s: {
-            path: list.tail(dom.makeOffsetPath(list.head(paras), sc)),
-            offset: so
-          },
-          e: {
-            path: list.tail(dom.makeOffsetPath(list.last(paras), ec)),
-            offset: eo
-          }
-        };
-      };
-
-      /**
-       * getClientRects
-       * @return {Rect[]}
-       */
-      this.getClientRects = function () {
-        var nativeRng = nativeRange();
-        return nativeRng.getClientRects();
-      };
-    };
-
-  /**
-   * @class core.range
-   *
-   * Data structure
-   *  * BoundaryPoint: a point of dom tree
-   *  * BoundaryPoints: two boundaryPoints corresponding to the start and the end of the Range
-   *
-   * See to http://www.w3.org/TR/DOM-Level-2-Traversal-Range/ranges.html#Level-2-Range-Position
-   *
-   * @singleton
-   * @alternateClassName range
-   */
-    return {
-      /**
-       * @method
-       * 
-       * create Range Object From arguments or Browser Selection
-       *
-       * @param {Node} sc - start container
-       * @param {Number} so - start offset
-       * @param {Node} ec - end container
-       * @param {Number} eo - end offset
-       * @return {WrappedRange}
-       */
-      create : function (sc, so, ec, eo) {
-        if (!arguments.length) { // from Browser Selection
-          if (agent.isW3CRangeSupport) {
-            var selection = document.getSelection();
-            if (selection.rangeCount === 0) {
-              return null;
-            } else if (dom.isBody(selection.anchorNode)) {
-              // Firefox: returns entire body as range on initialization. We won't never need it.
-              return null;
-            }
-  
-            var nativeRng = selection.getRangeAt(0);
-            sc = nativeRng.startContainer;
-            so = nativeRng.startOffset;
-            ec = nativeRng.endContainer;
-            eo = nativeRng.endOffset;
-          } else { // IE8: TextRange
-            var textRange = document.selection.createRange();
-            var textRangeEnd = textRange.duplicate();
-            textRangeEnd.collapse(false);
-            var textRangeStart = textRange;
-            textRangeStart.collapse(true);
-  
-            var startPoint = textRangeToPoint(textRangeStart, true),
-            endPoint = textRangeToPoint(textRangeEnd, false);
-
-            // same visible point case: range was collapsed.
-            if (dom.isText(startPoint.node) && dom.isLeftEdgePoint(startPoint) &&
-                dom.isTextNode(endPoint.node) && dom.isRightEdgePoint(endPoint) &&
-                endPoint.node.nextSibling === startPoint.node) {
-              startPoint = endPoint;
-            }
-
-            sc = startPoint.cont;
-            so = startPoint.offset;
-            ec = endPoint.cont;
-            eo = endPoint.offset;
-          }
-        } else if (arguments.length === 2) { //collapsed
-          ec = sc;
-          eo = so;
-        }
-        return new WrappedRange(sc, so, ec, eo);
-      },
-
-      /**
-       * @method 
-       * 
-       * create WrappedRange from node
-       *
-       * @param {Node} node
-       * @return {WrappedRange}
-       */
-      createFromNode: function (node) {
-        var sc = node;
-        var so = 0;
-        var ec = node;
-        var eo = dom.nodeLength(ec);
-
-        // browsers can't target a picture or void node
-        if (dom.isVoid(sc)) {
-          so = dom.listPrev(sc).length - 1;
-          sc = sc.parentNode;
-        }
-        if (dom.isBR(ec)) {
-          eo = dom.listPrev(ec).length - 1;
-          ec = ec.parentNode;
-        } else if (dom.isVoid(ec)) {
-          eo = dom.listPrev(ec).length;
-          ec = ec.parentNode;
-        }
-
-        return this.create(sc, so, ec, eo);
-      },
-
-      /**
-       * @method 
-       * 
-       * create WrappedRange from bookmark
-       *
-       * @param {Node} editable
-       * @param {Object} bookmark
-       * @return {WrappedRange}
-       */
-      createFromBookmark : function (editable, bookmark) {
-        var sc = dom.fromOffsetPath(editable, bookmark.s.path);
-        var so = bookmark.s.offset;
-        var ec = dom.fromOffsetPath(editable, bookmark.e.path);
-        var eo = bookmark.e.offset;
-        return new WrappedRange(sc, so, ec, eo);
-      },
-
-      /**
-       * @method 
-       *
-       * create WrappedRange from paraBookmark
-       *
-       * @param {Object} bookmark
-       * @param {Node[]} paras
-       * @return {WrappedRange}
-       */
-      createFromParaBookmark: function (bookmark, paras) {
-        var so = bookmark.s.offset;
-        var eo = bookmark.e.offset;
-        var sc = dom.fromOffsetPath(list.head(paras), bookmark.s.path);
-        var ec = dom.fromOffsetPath(list.last(paras), bookmark.e.path);
-
-        return new WrappedRange(sc, so, ec, eo);
-      }
-    };
-  })();
-
-  /**
-   * @class defaults 
-   * 
-   * @singleton
-   */
-  var defaults = {
-    /** @property */
-    version: '0.6.6',
-
-    /**
-     * 
-     * for event options, reference to EventHandler.attach
-     * 
-     * @property {Object} options 
-     * @property {String/Number} [options.width=null] set editor width 
-     * @property {String/Number} [options.height=null] set editor height, ex) 300
-     * @property {String/Number} options.minHeight set minimum height of editor
-     * @property {String/Number} options.maxHeight
-     * @property {String/Number} options.focus 
-     * @property {Number} options.tabsize 
-     * @property {Boolean} options.styleWithSpan
-     * @property {Object} options.codemirror
-     * @property {Object} [options.codemirror.mode='text/html']
-     * @property {Object} [options.codemirror.htmlMode=true]
-     * @property {Object} [options.codemirror.lineNumbers=true]
-     * @property {String} [options.lang=en-US] language 'en-US', 'ko-KR', ...
-     * @property {String} [options.direction=null] text direction, ex) 'rtl'
-     * @property {Array} [options.toolbar]
-     * @property {Boolean} [options.airMode=false]
-     * @property {Array} [options.airPopover]
-     * @property {Fucntion} [options.onInit] initialize
-     * @property {Fucntion} [options.onsubmit]
-     */
-    options: {
-      width: null,                  // set editor width
-      height: null,                 // set editor height, ex) 300
-
-      minHeight: null,              // set minimum height of editor
-      maxHeight: null,              // set maximum height of editor
-
-      focus: false,                 // set focus to editable area after initializing summernote
-
-      tabsize: 4,                   // size of tab ex) 2 or 4
-      styleWithSpan: true,          // style with span (Chrome and FF only)
-
-      disableLinkTarget: false,     // hide link Target Checkbox
-      disableDragAndDrop: false,    // disable drag and drop event
-      disableResizeEditor: false,   // disable resizing editor
-
-      shortcuts: true,              // enable keyboard shortcuts
-
-      placeholder: false,           // enable placeholder text
-      prettifyHtml: true,           // enable prettifying html while toggling codeview
-
-      iconPrefix: 'fa fa-',         // prefix for css icon classes
-
-      codemirror: {                 // codemirror options
-        mode: 'text/html',
-        htmlMode: true,
-        lineNumbers: true
-      },
-
-      // language
-      lang: 'en-US',                // language 'en-US', 'ko-KR', ...
-      direction: null,              // text direction, ex) 'rtl'
-
-      // toolbar
-      toolbar: [
-        ['style', ['style']],
-        ['font', ['bold', 'italic', 'underline', 'clear']],
-        // ['font', ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'clear']],
-        ['fontname', ['fontname']],
-        // ['fontsize', ['fontsize']],
-        ['color', ['color']],
-        ['para', ['ul', 'ol', 'paragraph']],
-        ['height', ['height']],
-        ['table', ['table']],
-        ['insert', ['link', 'picture', 'hr']],
-        ['view', ['fullscreen', 'codeview']],
-        ['help', ['help']]
-      ],
-
-      // air mode: inline editor
-      airMode: false,
-      // airPopover: [
-      //   ['style', ['style']],
-      //   ['font', ['bold', 'italic', 'underline', 'clear']],
-      //   ['fontname', ['fontname']],
-      //   ['color', ['color']],
-      //   ['para', ['ul', 'ol', 'paragraph']],
-      //   ['height', ['height']],
-      //   ['table', ['table']],
-      //   ['insert', ['link', 'picture']],
-      //   ['help', ['help']]
-      // ],
-      airPopover: [
-        ['color', ['color']],
-        ['font', ['bold', 'underline', 'clear']],
-        ['para', ['ul', 'paragraph']],
-        ['table', ['table']],
-        ['insert', ['link', 'picture']]
-      ],
-
-      // style tag
-      styleTags: ['p', 'blockquote', 'pre', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-
-      // default fontName
-      defaultFontName: 'Helvetica Neue',
-
-      // fontName
-      fontNames: [
-        'Arial', 'Arial Black', 'Comic Sans MS', 'Courier New',
-        'Helvetica Neue', 'Helvetica', 'Impact', 'Lucida Grande',
-        'Tahoma', 'Times New Roman', 'Verdana'
-      ],
-      fontNamesIgnoreCheck: [],
-
-      fontSizes: ['8', '9', '10', '11', '12', '14', '18', '24', '36'],
-
-      // pallete colors(n x n)
-      colors: [
-        ['#000000', '#424242', '#636363', '#9C9C94', '#CEC6CE', '#EFEFEF', '#F7F7F7', '#FFFFFF'],
-        ['#FF0000', '#FF9C00', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#9C00FF', '#FF00FF'],
-        ['#F7C6CE', '#FFE7CE', '#FFEFC6', '#D6EFD6', '#CEDEE7', '#CEE7F7', '#D6D6E7', '#E7D6DE'],
-        ['#E79C9C', '#FFC69C', '#FFE79C', '#B5D6A5', '#A5C6CE', '#9CC6EF', '#B5A5D6', '#D6A5BD'],
-        ['#E76363', '#F7AD6B', '#FFD663', '#94BD7B', '#73A5AD', '#6BADDE', '#8C7BC6', '#C67BA5'],
-        ['#CE0000', '#E79439', '#EFC631', '#6BA54A', '#4A7B8C', '#3984C6', '#634AA5', '#A54A7B'],
-        ['#9C0000', '#B56308', '#BD9400', '#397B21', '#104A5A', '#085294', '#311873', '#731842'],
-        ['#630000', '#7B3900', '#846300', '#295218', '#083139', '#003163', '#21104A', '#4A1031']
-      ],
-
-      // lineHeight
-      lineHeights: ['1.0', '1.2', '1.4', '1.5', '1.6', '1.8', '2.0', '3.0'],
-
-      // insertTable max size
-      insertTableMaxSize: {
-        col: 10,
-        row: 10
-      },
-
-      // image
-      maximumImageFileSize: null, // size in bytes, null = no limit
-
-      // callbacks
-      oninit: null,             // initialize
-      onfocus: null,            // editable has focus
-      onblur: null,             // editable out of focus
-      onenter: null,            // enter key pressed
-      onkeyup: null,            // keyup
-      onkeydown: null,          // keydown
-      onImageUpload: null,      // imageUpload
-      onImageUploadError: null, // imageUploadError
-      onMediaDelete: null,      // media delete
-      onToolbarClick: null,
-      onsubmit: null,
-
-      /**
-       * manipulate link address when user create link
-       * @param {String} sLinkUrl
-       * @return {String}
-       */
-      onCreateLink: function (sLinkUrl) {
-        if (sLinkUrl.indexOf('@') !== -1 && sLinkUrl.indexOf(':') === -1) {
-          sLinkUrl =  'mailto:' + sLinkUrl;
-        } else if (sLinkUrl.indexOf('://') === -1) {
-          sLinkUrl = 'http://' + sLinkUrl;
-        }
-
-        return sLinkUrl;
-      },
-
-      keyMap: {
-        pc: {
-          'ENTER': 'insertParagraph',
-          'CTRL+Z': 'undo',
-          'CTRL+Y': 'redo',
-          'TAB': 'tab',
-          'SHIFT+TAB': 'untab',
-          'CTRL+B': 'bold',
-          'CTRL+I': 'italic',
-          'CTRL+U': 'underline',
-          'CTRL+SHIFT+S': 'strikethrough',
-          'CTRL+BACKSLASH': 'removeFormat',
-          'CTRL+SHIFT+L': 'justifyLeft',
-          'CTRL+SHIFT+E': 'justifyCenter',
-          'CTRL+SHIFT+R': 'justifyRight',
-          'CTRL+SHIFT+J': 'justifyFull',
-          'CTRL+SHIFT+NUM7': 'insertUnorderedList',
-          'CTRL+SHIFT+NUM8': 'insertOrderedList',
-          'CTRL+LEFTBRACKET': 'outdent',
-          'CTRL+RIGHTBRACKET': 'indent',
-          'CTRL+NUM0': 'formatPara',
-          'CTRL+NUM1': 'formatH1',
-          'CTRL+NUM2': 'formatH2',
-          'CTRL+NUM3': 'formatH3',
-          'CTRL+NUM4': 'formatH4',
-          'CTRL+NUM5': 'formatH5',
-          'CTRL+NUM6': 'formatH6',
-          'CTRL+ENTER': 'insertHorizontalRule',
-          'CTRL+K': 'showLinkDialog'
-        },
-
-        mac: {
-          'ENTER': 'insertParagraph',
-          'CMD+Z': 'undo',
-          'CMD+SHIFT+Z': 'redo',
-          'TAB': 'tab',
-          'SHIFT+TAB': 'untab',
-          'CMD+B': 'bold',
-          'CMD+I': 'italic',
-          'CMD+U': 'underline',
-          'CMD+SHIFT+S': 'strikethrough',
-          'CMD+BACKSLASH': 'removeFormat',
-          'CMD+SHIFT+L': 'justifyLeft',
-          'CMD+SHIFT+E': 'justifyCenter',
-          'CMD+SHIFT+R': 'justifyRight',
-          'CMD+SHIFT+J': 'justifyFull',
-          'CMD+SHIFT+NUM7': 'insertUnorderedList',
-          'CMD+SHIFT+NUM8': 'insertOrderedList',
-          'CMD+LEFTBRACKET': 'outdent',
-          'CMD+RIGHTBRACKET': 'indent',
-          'CMD+NUM0': 'formatPara',
-          'CMD+NUM1': 'formatH1',
-          'CMD+NUM2': 'formatH2',
-          'CMD+NUM3': 'formatH3',
-          'CMD+NUM4': 'formatH4',
-          'CMD+NUM5': 'formatH5',
-          'CMD+NUM6': 'formatH6',
-          'CMD+ENTER': 'insertHorizontalRule',
-          'CMD+K': 'showLinkDialog'
-        }
-      }
-    },
-
-    // default language: en-US
-    lang: {
-      'en-US': {
-        font: {
-          bold: 'Bold',
-          italic: 'Italic',
-          underline: 'Underline',
-          clear: 'Remove Font Style',
-          height: 'Line Height',
-          name: 'Font Family',
-          strikethrough: 'Strikethrough',
-          subscript: 'Subscript',
-          superscript: 'Superscript',
-          size: 'Font Size'
-        },
-        image: {
-          image: 'Picture',
-          insert: 'Insert Image',
-          resizeFull: 'Resize Full',
-          resizeHalf: 'Resize Half',
-          resizeQuarter: 'Resize Quarter',
-          floatLeft: 'Float Left',
-          floatRight: 'Float Right',
-          floatNone: 'Float None',
-          shapeRounded: 'Shape: Rounded',
-          shapeCircle: 'Shape: Circle',
-          shapeThumbnail: 'Shape: Thumbnail',
-          shapeNone: 'Shape: None',
-          dragImageHere: 'Drag image or text here',
-          dropImage: 'Drop image or Text',
-          selectFromFiles: 'Select from files',
-          maximumFileSize: 'Maximum file size',
-          maximumFileSizeError: 'Maximum file size exceeded.',
-          url: 'Image URL',
-          remove: 'Remove Image'
-        },
-        link: {
-          link: 'Link',
-          insert: 'Insert Link',
-          unlink: 'Unlink',
-          edit: 'Edit',
-          textToDisplay: 'Text to display',
-          url: 'To what URL should this link go?',
-          openInNewWindow: 'Open in new window'
-        },
-        table: {
-          table: 'Table'
-        },
-        hr: {
-          insert: 'Insert Horizontal Rule'
-        },
-        style: {
-          style: 'Style',
-          normal: 'Normal',
-          blockquote: 'Quote',
-          pre: 'Code',
-          h1: 'Header 1',
-          h2: 'Header 2',
-          h3: 'Header 3',
-          h4: 'Header 4',
-          h5: 'Header 5',
-          h6: 'Header 6'
-        },
-        lists: {
-          unordered: 'Unordered list',
-          ordered: 'Ordered list'
-        },
-        options: {
-          help: 'Help',
-          fullscreen: 'Full Screen',
-          codeview: 'Code View'
-        },
-        paragraph: {
-          paragraph: 'Paragraph',
-          outdent: 'Outdent',
-          indent: 'Indent',
-          left: 'Align left',
-          center: 'Align center',
-          right: 'Align right',
-          justify: 'Justify full'
-        },
-        color: {
-          recent: 'Recent Color',
-          more: 'More Color',
-          background: 'Background Color',
-          foreground: 'Foreground Color',
-          transparent: 'Transparent',
-          setTransparent: 'Set transparent',
-          reset: 'Reset',
-          resetToDefault: 'Reset to default'
-        },
-        shortcut: {
-          shortcuts: 'Keyboard shortcuts',
-          close: 'Close',
-          textFormatting: 'Text formatting',
-          action: 'Action',
-          paragraphFormatting: 'Paragraph formatting',
-          documentStyle: 'Document Style',
-          extraKeys: 'Extra keys'
-        },
-        history: {
-          undo: 'Undo',
-          redo: 'Redo'
-        }
-      }
-    }
-  };
-
-  /**
-   * @class core.async
-   *
-   * Async functions which returns `Promise`
-   *
-   * @singleton
-   * @alternateClassName async
-   */
-  var async = (function () {
-    /**
-     * @method readFileAsDataURL
-     *
-     * read contents of file as representing URL
-     *
-     * @param {File} file
-     * @return {Promise} - then: sDataUrl
-     */
-    var readFileAsDataURL = function (file) {
-      return $.Deferred(function (deferred) {
-        $.extend(new FileReader(), {
-          onload: function (e) {
-            var sDataURL = e.target.result;
-            deferred.resolve(sDataURL);
-          },
-          onerror: function () {
-            deferred.reject(this);
-          }
-        }).readAsDataURL(file);
-      }).promise();
-    };
-  
-    /**
-     * @method createImage
-     *
-     * create `<image>` from url string
-     *
-     * @param {String} sUrl
-     * @param {String} filename
-     * @return {Promise} - then: $image
-     */
-    var createImage = function (sUrl, filename) {
-      return $.Deferred(function (deferred) {
-        var $img = $('<img>');
-
-        $img.one('load', function () {
-          $img.off('error abort');
-          deferred.resolve($img);
-        }).one('error abort', function () {
-          $img.off('load').detach();
-          deferred.reject($img);
-        }).css({
-          display: 'none'
-        }).appendTo(document.body).attr({
-          'src': sUrl,
-          'data-filename': filename
-        });
-      }).promise();
-    };
-
-    return {
-      readFileAsDataURL: readFileAsDataURL,
-      createImage: createImage
-    };
-  })();
-
-  /**
-   * @class core.key
-   *
-   * Object for keycodes.
-   *
-   * @singleton
-   * @alternateClassName key
-   */
-  var key = (function () {
-    var keyMap = {
-      'BACKSPACE': 8,
-      'TAB': 9,
-      'ENTER': 13,
-      'SPACE': 32,
-
-      // Number: 0-9
-      'NUM0': 48,
-      'NUM1': 49,
-      'NUM2': 50,
-      'NUM3': 51,
-      'NUM4': 52,
-      'NUM5': 53,
-      'NUM6': 54,
-      'NUM7': 55,
-      'NUM8': 56,
-
-      // Alphabet: a-z
-      'B': 66,
-      'E': 69,
-      'I': 73,
-      'J': 74,
-      'K': 75,
-      'L': 76,
-      'R': 82,
-      'S': 83,
-      'U': 85,
-      'Y': 89,
-      'Z': 90,
-
-      'SLASH': 191,
-      'LEFTBRACKET': 219,
-      'BACKSLASH': 220,
-      'RIGHTBRACKET': 221
-    };
-
-    return {
-      /**
-       * @method isEdit
-       *
-       * @param {Number} keyCode
-       * @return {Boolean}
-       */
-      isEdit: function (keyCode) {
-        return list.contains([8, 9, 13, 32], keyCode);
-      },
-      /**
-       * @property {Object} nameFromCode
-       * @property {String} nameFromCode.8 "BACKSPACE"
-       */
-      nameFromCode: func.invertObject(keyMap),
-      code: keyMap
-    };
-  })();
-
-  /**
-   * @class editing.History
-   *
-   * Editor History
-   *
-   */
-  var History = function ($editable) {
-    var stack = [], stackOffset = -1;
-    var editable = $editable[0];
-
-    var makeSnapshot = function () {
-      var rng = range.create();
-      var emptyBookmark = {s: {path: [], offset: 0}, e: {path: [], offset: 0}};
-
-      return {
-        contents: $editable.html(),
-        bookmark: (rng ? rng.bookmark(editable) : emptyBookmark)
-      };
-    };
-
-    var applySnapshot = function (snapshot) {
-      if (snapshot.contents !== null) {
-        $editable.html(snapshot.contents);
-      }
-      if (snapshot.bookmark !== null) {
-        range.createFromBookmark(editable, snapshot.bookmark).select();
-      }
-    };
-
-    /**
-     * undo
-     */
-    this.undo = function () {
-      if (0 < stackOffset) {
-        stackOffset--;
-        applySnapshot(stack[stackOffset]);
-      }
-    };
-
-    /**
-     * redo
-     */
-    this.redo = function () {
-      if (stack.length - 1 > stackOffset) {
-        stackOffset++;
-        applySnapshot(stack[stackOffset]);
-      }
-    };
-
-    /**
-     * recorded undo
-     */
-    this.recordUndo = function () {
-      stackOffset++;
-
-      // Wash out stack after stackOffset
-      if (stack.length > stackOffset) {
-        stack = stack.slice(0, stackOffset);
-      }
-
-      // Create new snapshot and push it to the end
-      stack.push(makeSnapshot());
-    };
-
-    // Create first undo stack
-    this.recordUndo();
-  };
-
-  /**
-   * @class editing.Style
-   *
-   * Style
-   *
-   */
-  var Style = function () {
-    /**
-     * @method jQueryCSS
-     *
-     * [workaround] for old jQuery
-     * passing an array of style properties to .css()
-     * will result in an object of property-value pairs.
-     * (compability with version < 1.9)
-     *
-     * @private
-     * @param  {jQuery} $obj
-     * @param  {Array} propertyNames - An array of one or more CSS properties.
-     * @return {Object}
-     */
-    var jQueryCSS = function ($obj, propertyNames) {
-      if (agent.jqueryVersion < 1.9) {
-        var result = {};
-        $.each(propertyNames, function (idx, propertyName) {
-          result[propertyName] = $obj.css(propertyName);
-        });
-        return result;
-      }
-      return $obj.css.call($obj, propertyNames);
-    };
-
-    /**
-     * paragraph level style
-     *
-     * @param {WrappedRange} rng
-     * @param {Object} styleInfo
-     */
-    this.stylePara = function (rng, styleInfo) {
-      $.each(rng.nodes(dom.isPara, {
-        includeAncestor: true
-      }), function (idx, para) {
-        $(para).css(styleInfo);
-      });
-    };
-
-    /**
-     * insert and returns styleNodes on range.
-     *
-     * @param {WrappedRange} rng
-     * @param {Object} [options] - options for styleNodes
-     * @param {String} [options.nodeName] - default: `SPAN`
-     * @param {Boolean} [options.expandClosestSibling] - default: `false`
-     * @param {Boolean} [options.onlyPartialContains] - default: `false`
-     * @return {Node[]}
-     */
-    this.styleNodes = function (rng, options) {
-      rng = rng.splitText();
-
-      var nodeName = options && options.nodeName || 'SPAN';
-      var expandClosestSibling = !!(options && options.expandClosestSibling);
-      var onlyPartialContains = !!(options && options.onlyPartialContains);
-
-      if (rng.isCollapsed()) {
-        return rng.insertNode(dom.create(nodeName));
-      }
-
-      var pred = dom.makePredByNodeName(nodeName);
-      var nodes = $.map(rng.nodes(dom.isText, {
-        fullyContains: true
-      }), function (text) {
-        return dom.singleChildAncestor(text, pred) || dom.wrap(text, nodeName);
-      });
-
-      if (expandClosestSibling) {
-        if (onlyPartialContains) {
-          var nodesInRange = rng.nodes();
-          // compose with partial contains predication
-          pred = func.and(pred, function (node) {
-            return list.contains(nodesInRange, node);
-          });
-        }
-
-        return $.map(nodes, function (node) {
-          var siblings = dom.withClosestSiblings(node, pred);
-          var head = list.head(siblings);
-          var tails = list.tail(siblings);
-          $.each(tails, function (idx, elem) {
-            dom.appendChildNodes(head, elem.childNodes);
-            dom.remove(elem);
-          });
-          return list.head(siblings);
-        });
-      } else {
-        return nodes;
-      }
-    };
-
-    /**
-     * get current style on cursor
-     *
-     * @param {WrappedRange} rng
-     * @param {Node} target - target element on event
-     * @return {Object} - object contains style properties.
-     */
-    this.current = function (rng, target) {
-      var $cont = $(dom.isText(rng.sc) ? rng.sc.parentNode : rng.sc);
-      var properties = ['font-family', 'font-size', 'text-align', 'list-style-type', 'line-height'];
-      var styleInfo = jQueryCSS($cont, properties) || {};
-
-      styleInfo['font-size'] = parseInt(styleInfo['font-size'], 10);
-
-      // document.queryCommandState for toggle state
-      styleInfo['font-bold'] = document.queryCommandState('bold') ? 'bold' : 'normal';
-      styleInfo['font-italic'] = document.queryCommandState('italic') ? 'italic' : 'normal';
-      styleInfo['font-underline'] = document.queryCommandState('underline') ? 'underline' : 'normal';
-      styleInfo['font-strikethrough'] = document.queryCommandState('strikeThrough') ? 'strikethrough' : 'normal';
-      styleInfo['font-superscript'] = document.queryCommandState('superscript') ? 'superscript' : 'normal';
-      styleInfo['font-subscript'] = document.queryCommandState('subscript') ? 'subscript' : 'normal';
-
-      // list-style-type to list-style(unordered, ordered)
-      if (!rng.isOnList()) {
-        styleInfo['list-style'] = 'none';
-      } else {
-        var aOrderedType = ['circle', 'disc', 'disc-leading-zero', 'square'];
-        var isUnordered = $.inArray(styleInfo['list-style-type'], aOrderedType) > -1;
-        styleInfo['list-style'] = isUnordered ? 'unordered' : 'ordered';
-      }
-
-      var para = dom.ancestor(rng.sc, dom.isPara);
-      if (para && para.style['line-height']) {
-        styleInfo['line-height'] = para.style.lineHeight;
-      } else {
-        var lineHeight = parseInt(styleInfo['line-height'], 10) / parseInt(styleInfo['font-size'], 10);
-        styleInfo['line-height'] = lineHeight.toFixed(1);
-      }
-
-      styleInfo.image = dom.isImg(target) && target;
-      styleInfo.anchor = rng.isOnAnchor() && dom.ancestor(rng.sc, dom.isAnchor);
-      styleInfo.ancestors = dom.listAncestor(rng.sc, dom.isEditable);
-      styleInfo.range = rng;
-
-      return styleInfo;
-    };
-  };
-
-
-  /**
-   * @class editing.Bullet
-   *
-   * @alternateClassName Bullet
-   */
-  var Bullet = function () {
-    /**
-     * @method insertOrderedList
-     *
-     * toggle ordered list
-     *
-     * @type command
-     */
-    this.insertOrderedList = function () {
-      this.toggleList('OL');
-    };
-
-    /**
-     * @method insertUnorderedList
-     *
-     * toggle unordered list
-     *
-     * @type command
-     */
-    this.insertUnorderedList = function () {
-      this.toggleList('UL');
-    };
-
-    /**
-     * @method indent
-     *
-     * indent
-     *
-     * @type command
-     */
-    this.indent = function () {
-      var self = this;
-      var rng = range.create().wrapBodyInlineWithPara();
-
-      var paras = rng.nodes(dom.isPara, { includeAncestor: true });
-      var clustereds = list.clusterBy(paras, func.peq2('parentNode'));
-
-      $.each(clustereds, function (idx, paras) {
-        var head = list.head(paras);
-        if (dom.isLi(head)) {
-          self.wrapList(paras, head.parentNode.nodeName);
-        } else {
-          $.each(paras, function (idx, para) {
-            $(para).css('marginLeft', function (idx, val) {
-              return (parseInt(val, 10) || 0) + 25;
-            });
-          });
-        }
-      });
-
-      rng.select();
-    };
-
-    /**
-     * @method outdent
-     *
-     * outdent
-     *
-     * @type command
-     */
-    this.outdent = function () {
-      var self = this;
-      var rng = range.create().wrapBodyInlineWithPara();
-
-      var paras = rng.nodes(dom.isPara, { includeAncestor: true });
-      var clustereds = list.clusterBy(paras, func.peq2('parentNode'));
-
-      $.each(clustereds, function (idx, paras) {
-        var head = list.head(paras);
-        if (dom.isLi(head)) {
-          self.releaseList([paras]);
-        } else {
-          $.each(paras, function (idx, para) {
-            $(para).css('marginLeft', function (idx, val) {
-              val = (parseInt(val, 10) || 0);
-              return val > 25 ? val - 25 : '';
-            });
-          });
-        }
-      });
-
-      rng.select();
-    };
-
-    /**
-     * @method toggleList
-     *
-     * toggle list
-     *
-     * @param {String} listName - OL or UL
-     */
-    this.toggleList = function (listName) {
-      var self = this;
-      var rng = range.create().wrapBodyInlineWithPara();
-
-      var paras = rng.nodes(dom.isPara, { includeAncestor: true });
-      var bookmark = rng.paraBookmark(paras);
-      var clustereds = list.clusterBy(paras, func.peq2('parentNode'));
-
-      // paragraph to list
-      if (list.find(paras, dom.isPurePara)) {
-        var wrappedParas = [];
-        $.each(clustereds, function (idx, paras) {
-          wrappedParas = wrappedParas.concat(self.wrapList(paras, listName));
-        });
-        paras = wrappedParas;
-      // list to paragraph or change list style
-      } else {
-        var diffLists = rng.nodes(dom.isList, {
-          includeAncestor: true
-        }).filter(function (listNode) {
-          return !$.nodeName(listNode, listName);
-        });
-
-        if (diffLists.length) {
-          $.each(diffLists, function (idx, listNode) {
-            dom.replace(listNode, listName);
-          });
-        } else {
-          paras = this.releaseList(clustereds, true);
-        }
-      }
-
-      range.createFromParaBookmark(bookmark, paras).select();
-    };
-
-    /**
-     * @method wrapList
-     *
-     * @param {Node[]} paras
-     * @param {String} listName
-     * @return {Node[]}
-     */
-    this.wrapList = function (paras, listName) {
-      var head = list.head(paras);
-      var last = list.last(paras);
-
-      var prevList = dom.isList(head.previousSibling) && head.previousSibling;
-      var nextList = dom.isList(last.nextSibling) && last.nextSibling;
-
-      var listNode = prevList || dom.insertAfter(dom.create(listName || 'UL'), last);
-
-      // P to LI
-      paras = $.map(paras, function (para) {
-        return dom.isPurePara(para) ? dom.replace(para, 'LI') : para;
-      });
-
-      // append to list(<ul>, <ol>)
-      dom.appendChildNodes(listNode, paras);
-
-      if (nextList) {
-        dom.appendChildNodes(listNode, list.from(nextList.childNodes));
-        dom.remove(nextList);
-      }
-
-      return paras;
-    };
-
-    /**
-     * @method releaseList
-     *
-     * @param {Array[]} clustereds
-     * @param {Boolean} isEscapseToBody
-     * @return {Node[]}
-     */
-    this.releaseList = function (clustereds, isEscapseToBody) {
-      var releasedParas = [];
-
-      $.each(clustereds, function (idx, paras) {
-        var head = list.head(paras);
-        var last = list.last(paras);
-
-        var headList = isEscapseToBody ? dom.lastAncestor(head, dom.isList) :
-                                         head.parentNode;
-        var lastList = headList.childNodes.length > 1 ? dom.splitTree(headList, {
-          node: last.parentNode,
-          offset: dom.position(last) + 1
-        }, {
-          isSkipPaddingBlankHTML: true
-        }) : null;
-
-        var middleList = dom.splitTree(headList, {
-          node: head.parentNode,
-          offset: dom.position(head)
-        }, {
-          isSkipPaddingBlankHTML: true
-        });
-
-        paras = isEscapseToBody ? dom.listDescendant(middleList, dom.isLi) :
-                                  list.from(middleList.childNodes).filter(dom.isLi);
-
-        // LI to P
-        if (isEscapseToBody || !dom.isList(headList.parentNode)) {
-          paras = $.map(paras, function (para) {
-            return dom.replace(para, 'P');
-          });
-        }
-
-        $.each(list.from(paras).reverse(), function (idx, para) {
-          dom.insertAfter(para, headList);
-        });
-
-        // remove empty lists
-        var rootLists = list.compact([headList, middleList, lastList]);
-        $.each(rootLists, function (idx, rootList) {
-          var listNodes = [rootList].concat(dom.listDescendant(rootList, dom.isList));
-          $.each(listNodes.reverse(), function (idx, listNode) {
-            if (!dom.nodeLength(listNode)) {
-              dom.remove(listNode, true);
-            }
-          });
-        });
-
-        releasedParas = releasedParas.concat(paras);
-      });
-
-      return releasedParas;
-    };
-  };
-
-
-  /**
-   * @class editing.Typing
-   *
-   * Typing
-   *
-   */
-  var Typing = function () {
-
-    // a Bullet instance to toggle lists off
-    var bullet = new Bullet();
-
-    /**
-     * insert tab
-     *
-     * @param {jQuery} $editable
-     * @param {WrappedRange} rng
-     * @param {Number} tabsize
-     */
-    this.insertTab = function ($editable, rng, tabsize) {
-      var tab = dom.createText(new Array(tabsize + 1).join(dom.NBSP_CHAR));
-      rng = rng.deleteContents();
-      rng.insertNode(tab, true);
-
-      rng = range.create(tab, tabsize);
-      rng.select();
-    };
-
-    /**
-     * insert paragraph
-     */
-    this.insertParagraph = function () {
-      var rng = range.create();
-
-      // deleteContents on range.
-      rng = rng.deleteContents();
-
-      // Wrap range if it needs to be wrapped by paragraph
-      rng = rng.wrapBodyInlineWithPara();
-
-      // finding paragraph
-      var splitRoot = dom.ancestor(rng.sc, dom.isPara);
-
-      var nextPara;
-      // on paragraph: split paragraph
-      if (splitRoot) {
-        // if it is an empty line with li
-        if (dom.isEmpty(splitRoot) && dom.isLi(splitRoot)) {
-          // disable UL/OL and escape!
-          bullet.toggleList(splitRoot.parentNode.nodeName);
-          return;
-        // if new line has content (not a line break)
-        } else {
-          nextPara = dom.splitTree(splitRoot, rng.getStartPoint());
-
-          var emptyAnchors = dom.listDescendant(splitRoot, dom.isEmptyAnchor);
-          emptyAnchors = emptyAnchors.concat(dom.listDescendant(nextPara, dom.isEmptyAnchor));
-
-          $.each(emptyAnchors, function (idx, anchor) {
-            dom.remove(anchor);
-          });
-        }
-      // no paragraph: insert empty paragraph
-      } else {
-        var next = rng.sc.childNodes[rng.so];
-        nextPara = $(dom.emptyPara)[0];
-        if (next) {
-          rng.sc.insertBefore(nextPara, next);
-        } else {
-          rng.sc.appendChild(nextPara);
-        }
-      }
-
-      range.create(nextPara, 0).normalize().select();
-
-    };
-
-  };
-
-  /**
-   * @class editing.Table
-   *
-   * Table
-   *
-   */
-  var Table = function () {
-    /**
-     * handle tab key
-     *
-     * @param {WrappedRange} rng
-     * @param {Boolean} isShift
-     */
-    this.tab = function (rng, isShift) {
-      var cell = dom.ancestor(rng.commonAncestor(), dom.isCell);
-      var table = dom.ancestor(cell, dom.isTable);
-      var cells = dom.listDescendant(table, dom.isCell);
-
-      var nextCell = list[isShift ? 'prev' : 'next'](cells, cell);
-      if (nextCell) {
-        range.create(nextCell, 0).select();
-      }
-    };
-
-    /**
-     * create empty table element
-     *
-     * @param {Number} rowCount
-     * @param {Number} colCount
-     * @return {Node}
-     */
-    this.createTable = function (colCount, rowCount) {
-      var tds = [], tdHTML;
-      for (var idxCol = 0; idxCol < colCount; idxCol++) {
-        tds.push('<td>' + dom.blank + '</td>');
-      }
-      tdHTML = tds.join('');
-
-      var trs = [], trHTML;
-      for (var idxRow = 0; idxRow < rowCount; idxRow++) {
-        trs.push('<tr>' + tdHTML + '</tr>');
-      }
-      trHTML = trs.join('');
-      return $('<table class="table table-bordered">' + trHTML + '</table>')[0];
-    };
-  };
-
-  /**
-   * @class editing.Editor
-   *
-   * Editor
-   *
-   */
-  var Editor = function (handler) {
-
-    var style = new Style();
-    var table = new Table();
-    var typing = new Typing();
-    var bullet = new Bullet();
-
-    /**
-     * @method createRange
-     *
-     * create range
-     *
-     * @param {jQuery} $editable
-     * @return {WrappedRange}
-     */
-    this.createRange = function ($editable) {
-      $editable.focus();
-      return range.create();
-    };
-
-    /**
-     * @method saveRange
-     *
-     * save current range
-     *
-     * @param {jQuery} $editable
-     * @param {Boolean} [thenCollapse=false]
-     */
-    this.saveRange = function ($editable, thenCollapse) {
-      $editable.focus();
-      $editable.data('range', range.create());
-      if (thenCollapse) {
-        range.create().collapse().select();
-      }
-    };
-
-    /**
-     * @method saveRange
-     *
-     * save current node list to $editable.data('childNodes')
-     *
-     * @param {jQuery} $editable
-     */
-    this.saveNode = function ($editable) {
-      // copy child node reference
-      var copy = [];
-      for (var key  = 0, len = $editable[0].childNodes.length; key < len; key++) {
-        copy.push($editable[0].childNodes[key]);
-      }
-      $editable.data('childNodes', copy);
-    };
-
-    /**
-     * @method restoreRange
-     *
-     * restore lately range
-     *
-     * @param {jQuery} $editable
-     */
-    this.restoreRange = function ($editable) {
-      var rng = $editable.data('range');
-      if (rng) {
-        rng.select();
-        $editable.focus();
-      }
-    };
-
-    /**
-     * @method restoreNode
-     *
-     * restore lately node list
-     *
-     * @param {jQuery} $editable
-     */
-    this.restoreNode = function ($editable) {
-      $editable.html('');
-      var child = $editable.data('childNodes');
-      for (var index = 0, len = child.length; index < len; index++) {
-        $editable[0].appendChild(child[index]);
-      }
-    };
-    /**
-     * @method currentStyle
-     *
-     * current style
-     *
-     * @param {Node} target
-     * @return {Boolean} false if range is no
-     */
-    this.currentStyle = function (target) {
-      var rng = range.create();
-      return rng ? rng.isOnEditable() && style.current(rng, target) : false;
-    };
-
-    var triggerOnBeforeChange = function ($editable) {
-      var $holder = dom.makeLayoutInfo($editable).holder();
-      handler.bindCustomEvent(
-        $holder, $editable.data('callbacks'), 'before.command'
-      )($editable.html(), $editable);
-    };
-
-    var triggerOnChange = function ($editable) {
-      var $holder = dom.makeLayoutInfo($editable).holder();
-      handler.bindCustomEvent(
-        $holder, $editable.data('callbacks'), 'change'
-      )($editable.html(), $editable);
-    };
-
-    /**
-     * @method undo
-     * undo
-     * @param {jQuery} $editable
-     */
-    this.undo = function ($editable) {
-      triggerOnBeforeChange($editable);
-      $editable.data('NoteHistory').undo();
-      triggerOnChange($editable);
-    };
-
-    /**
-     * @method redo
-     * redo
-     * @param {jQuery} $editable
-     */
-    this.redo = function ($editable) {
-      triggerOnBeforeChange($editable);
-      $editable.data('NoteHistory').redo();
-      triggerOnChange($editable);
-    };
-
-    /**
-     * @method beforeCommand
-     * before command
-     * @param {jQuery} $editable
-     */
-    var beforeCommand = this.beforeCommand = function ($editable) {
-      triggerOnBeforeChange($editable);
-    };
-
-    /**
-     * @method afterCommand
-     * after command
-     * @param {jQuery} $editable
-     * @param {Boolean} isPreventTrigger
-     */
-    var afterCommand = this.afterCommand = function ($editable, isPreventTrigger) {
-      $editable.data('NoteHistory').recordUndo();
-      if (!isPreventTrigger) {
-        triggerOnChange($editable);
-      }
-    };
-
-    /**
-     * @method bold
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method italic
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method underline
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method strikethrough
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method formatBlock
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method superscript
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method subscript
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method justifyLeft
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method justifyCenter
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method justifyRight
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method justifyFull
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method formatBlock
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method removeFormat
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method backColor
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method foreColor
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method insertHorizontalRule
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /**
-     * @method fontName
-     *
-     * change font name
-     *
-     * @param {jQuery} $editable
-     * @param {Mixed} value
-     */
-
-    /* jshint ignore:start */
-    // native commands(with execCommand), generate function for execCommand
-    var commands = ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript',
-                    'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull',
-                    'formatBlock', 'removeFormat',
-                    'backColor', 'foreColor', 'insertHorizontalRule', 'fontName'];
-
-    for (var idx = 0, len = commands.length; idx < len; idx ++) {
-      this[commands[idx]] = (function (sCmd) {
-        return function ($editable, value) {
-          beforeCommand($editable);
-
-          document.execCommand(sCmd, false, value);
-
-          afterCommand($editable, true);
-        };
-      })(commands[idx]);
-    }
-    /* jshint ignore:end */
-
-    /**
-     * @method tab
-     *
-     * handle tab key
-     *
-     * @param {jQuery} $editable
-     * @param {Object} options
-     */
-    this.tab = function ($editable, options) {
-      var rng = range.create();
-      if (rng.isCollapsed() && rng.isOnCell()) {
-        table.tab(rng);
-      } else {
-        beforeCommand($editable);
-        typing.insertTab($editable, rng, options.tabsize);
-        afterCommand($editable);
-      }
-    };
-
-    /**
-     * @method untab
-     *
-     * handle shift+tab key
-     *
-     */
-    this.untab = function () {
-      var rng = range.create();
-      if (rng.isCollapsed() && rng.isOnCell()) {
-        table.tab(rng, true);
-      }
-    };
-
-    /**
-     * @method insertParagraph
-     *
-     * insert paragraph
-     *
-     * @param {Node} $editable
-     */
-    this.insertParagraph = function ($editable) {
-      beforeCommand($editable);
-      typing.insertParagraph($editable);
-      afterCommand($editable);
-    };
-
-    /**
-     * @method insertOrderedList
-     *
-     * @param {jQuery} $editable
-     */
-    this.insertOrderedList = function ($editable) {
-      beforeCommand($editable);
-      bullet.insertOrderedList($editable);
-      afterCommand($editable);
-    };
-
-    /**
-     * @param {jQuery} $editable
-     */
-    this.insertUnorderedList = function ($editable) {
-      beforeCommand($editable);
-      bullet.insertUnorderedList($editable);
-      afterCommand($editable);
-    };
-
-    /**
-     * @param {jQuery} $editable
-     */
-    this.indent = function ($editable) {
-      beforeCommand($editable);
-      bullet.indent($editable);
-      afterCommand($editable);
-    };
-
-    /**
-     * @param {jQuery} $editable
-     */
-    this.outdent = function ($editable) {
-      beforeCommand($editable);
-      bullet.outdent($editable);
-      afterCommand($editable);
-    };
-
-    /**
-     * insert image
-     *
-     * @param {jQuery} $editable
-     * @param {String} sUrl
-     */
-    this.insertImage = function ($editable, sUrl, filename) {
-      async.createImage(sUrl, filename).then(function ($image) {
-        beforeCommand($editable);
-        $image.css({
-          display: '',
-          width: Math.min($editable.width(), $image.width())
-        });
-        range.create().insertNode($image[0]);
-        range.createFromNode($image[0]).collapse().select();
-        afterCommand($editable);
-      }).fail(function () {
-        var callbacks = $editable.data('callbacks');
-        if (callbacks.onImageUploadError) {
-          callbacks.onImageUploadError();
-        }
-      });
-    };
-
-    /**
-     * @method insertNode
-     * insert node
-     * @param {Node} $editable
-     * @param {Node} node
-     */
-    this.insertNode = function ($editable, node) {
-      beforeCommand($editable);
-      var rng = this.createRange($editable);
-      rng.insertNode(node);
-      range.createFromNode(node).collapse().select();
-      afterCommand($editable);
-    };
-
-    /**
-     * insert text
-     * @param {Node} $editable
-     * @param {String} text
-     */
-    this.insertText = function ($editable, text) {
-      beforeCommand($editable);
-      var rng = this.createRange($editable);
-      var textNode = rng.insertNode(dom.createText(text));
-      range.create(textNode, dom.nodeLength(textNode)).select();
-      afterCommand($editable);
-    };
-
-    /**
-     * paste HTML
-     * @param {Node} $editable
-     * @param {String} markup
-     */
-    this.pasteHTML = function ($editable, markup) {
-      beforeCommand($editable);
-      var rng = this.createRange($editable);
-      var contents = rng.pasteHTML(markup);
-      range.createFromNode(list.last(contents)).collapse().select();
-      afterCommand($editable);
-    };
-
-    /**
-     * formatBlock
-     *
-     * @param {jQuery} $editable
-     * @param {String} tagName
-     */
-    this.formatBlock = function ($editable, tagName) {
-      beforeCommand($editable);
-      // [workaround] for MSIE, IE need `<`
-      tagName = agent.isMSIE ? '<' + tagName + '>' : tagName;
-      document.execCommand('FormatBlock', false, tagName);
-      afterCommand($editable);
-    };
-
-    this.formatPara = function ($editable) {
-      beforeCommand($editable);
-      this.formatBlock($editable, 'P');
-      afterCommand($editable);
-    };
-
-    /* jshint ignore:start */
-    for (var idx = 1; idx <= 6; idx ++) {
-      this['formatH' + idx] = function (idx) {
-        return function ($editable) {
-          this.formatBlock($editable, 'H' + idx);
-        };
-      }(idx);
-    };
-    /* jshint ignore:end */
-
-    /**
-     * fontSize
-     *
-     * @param {jQuery} $editable
-     * @param {String} value - px
-     */
-    this.fontSize = function ($editable, value) {
-      beforeCommand($editable);
-
-      var rng = this.createRange($editable);
-      var spans = style.styleNodes(rng);
-      $.each(spans, function (idx, span) {
-        $(span).css({
-          'font-size': value + 'px'
-        });
-      });
-
-      afterCommand($editable);
-    };
-
-    /**
-     * lineHeight
-     * @param {jQuery} $editable
-     * @param {String} value
-     */
-    this.lineHeight = function ($editable, value) {
-      beforeCommand($editable);
-      style.stylePara(range.create(), {
-        lineHeight: value
-      });
-      afterCommand($editable);
-    };
-
-    /**
-     * unlink
-     *
-     * @type command
-     *
-     * @param {jQuery} $editable
-     */
-    this.unlink = function ($editable) {
-      var rng = range.create();
-      if (rng.isOnAnchor()) {
-        var anchor = dom.ancestor(rng.sc, dom.isAnchor);
-        rng = range.createFromNode(anchor);
-        rng.select();
-
-        beforeCommand($editable);
-        document.execCommand('unlink');
-        afterCommand($editable);
-      }
-    };
-
-    /**
-     * create link (command)
-     *
-     * @param {jQuery} $editable
-     * @param {Object} linkInfo
-     * @param {Object} options
-     */
-    this.createLink = function ($editable, linkInfo, options) {
-      var linkUrl = linkInfo.url;
-      var linkText = linkInfo.text;
-      var isNewWindow = linkInfo.newWindow;
-      var rng = linkInfo.range;
-      var isTextChanged = rng.toString() !== linkText;
-
-      beforeCommand($editable);
-
-      if (options.onCreateLink) {
-        linkUrl = options.onCreateLink(linkUrl);
-      }
-
-      var anchors;
-      if (isTextChanged) {
-        // Create a new link when text changed.
-        var anchor = rng.insertNode($('<A>' + linkText + '</A>')[0]);
-        anchors = [anchor];
-      } else {
-        anchors = style.styleNodes(rng, {
-          nodeName: 'A',
-          expandClosestSibling: true,
-          onlyPartialContains: true
-        });
-      }
-
-      $.each(anchors, function (idx, anchor) {
-        $(anchor).attr('href', linkUrl);
-        if (isNewWindow) {
-          $(anchor).attr('target', '_blank');
-        } else {
-          $(anchor).removeAttr('target');
-        }
-      });
-
-      var startRange = range.createFromNode(list.head(anchors)).collapse(true);
-      var startPoint = startRange.getStartPoint();
-      var endRange = range.createFromNode(list.last(anchors)).collapse();
-      var endPoint = endRange.getEndPoint();
-
-      range.create(
-        startPoint.node,
-        startPoint.offset,
-        endPoint.node,
-        endPoint.offset
-      ).select();
-
-      afterCommand($editable);
-    };
-
-    /**
-     * returns link info
-     *
-     * @return {Object}
-     * @return {WrappedRange} return.range
-     * @return {String} return.text
-     * @return {Boolean} [return.isNewWindow=true]
-     * @return {String} [return.url=""]
-     */
-    this.getLinkInfo = function ($editable) {
-      $editable.focus();
-
-      var rng = range.create().expand(dom.isAnchor);
-
-      // Get the first anchor on range(for edit).
-      var $anchor = $(list.head(rng.nodes(dom.isAnchor)));
-
-      return {
-        range: rng,
-        text: rng.toString(),
-        isNewWindow: $anchor.length ? $anchor.attr('target') === '_blank' : false,
-        url: $anchor.length ? $anchor.attr('href') : ''
-      };
-    };
-
-    /**
-     * setting color
-     *
-     * @param {Node} $editable
-     * @param {Object} sObjColor  color code
-     * @param {String} sObjColor.foreColor foreground color
-     * @param {String} sObjColor.backColor background color
-     */
-    this.color = function ($editable, sObjColor) {
-      var oColor = JSON.parse(sObjColor);
-      var foreColor = oColor.foreColor, backColor = oColor.backColor;
-
-      beforeCommand($editable);
-
-      if (foreColor) { document.execCommand('foreColor', false, foreColor); }
-      if (backColor) { document.execCommand('backColor', false, backColor); }
-
-      afterCommand($editable);
-    };
-
-    /**
-     * insert Table
-     *
-     * @param {Node} $editable
-     * @param {String} sDim dimension of table (ex : "5x5")
-     */
-    this.insertTable = function ($editable, sDim) {
-      var dimension = sDim.split('x');
-      beforeCommand($editable);
-
-      var rng = range.create();
-      rng = rng.deleteContents();
-      rng.insertNode(table.createTable(dimension[0], dimension[1]));
-      afterCommand($editable);
-    };
-
-    /**
-     * float me
-     *
-     * @param {jQuery} $editable
-     * @param {String} value
-     * @param {jQuery} $target
-     */
-    this.floatMe = function ($editable, value, $target) {
-      beforeCommand($editable);
-      $target.css('float', value);
-      afterCommand($editable);
-    };
-
-    /**
-     * change image shape
-     *
-     * @param {jQuery} $editable
-     * @param {String} value css class
-     * @param {Node} $target
-     */
-    this.imageShape = function ($editable, value, $target) {
-      beforeCommand($editable);
-
-      $target.removeClass('img-rounded img-circle img-thumbnail');
-
-      if (value) {
-        $target.addClass(value);
-      }
-
-      afterCommand($editable);
-    };
-
-    /**
-     * resize overlay element
-     * @param {jQuery} $editable
-     * @param {String} value
-     * @param {jQuery} $target - target element
-     */
-    this.resize = function ($editable, value, $target) {
-      beforeCommand($editable);
-
-      $target.css({
-        width: value * 100 + '%',
-        height: ''
-      });
-
-      afterCommand($editable);
-    };
-
-    /**
-     * @param {Position} pos
-     * @param {jQuery} $target - target element
-     * @param {Boolean} [bKeepRatio] - keep ratio
-     */
-    this.resizeTo = function (pos, $target, bKeepRatio) {
-      var imageSize;
-      if (bKeepRatio) {
-        var newRatio = pos.y / pos.x;
-        var ratio = $target.data('ratio');
-        imageSize = {
-          width: ratio > newRatio ? pos.x : pos.y / ratio,
-          height: ratio > newRatio ? pos.x * ratio : pos.y
-        };
-      } else {
-        imageSize = {
-          width: pos.x,
-          height: pos.y
-        };
-      }
-
-      $target.css(imageSize);
-    };
-
-    /**
-     * remove media object
-     *
-     * @param {jQuery} $editable
-     * @param {String} value - dummy argument (for keep interface)
-     * @param {jQuery} $target - target element
-     */
-    this.removeMedia = function ($editable, value, $target) {
-      beforeCommand($editable);
-      $target.detach();
-
-      handler.bindCustomEvent(
-        $(), $editable.data('callbacks'), 'media.delete'
-      ).call($target, this.$editable);
-
-      afterCommand($editable);
-    };
-
-    /**
-     * set focus
-     *
-     * @param $editable
-     */
-    this.focus = function ($editable) {
-      $editable.focus();
-
-      // [workaround] for firefox bug http://goo.gl/lVfAaI
-      if (agent.isFF) {
-        range.createFromNode($editable[0].firstChild || $editable[0]).collapse().select();
-      }
-    };
-  };
-
-  /**
-   * @class module.Button
-   *
-   * Button
-   */
-  var Button = function () {
-    /**
-     * update button status
-     *
-     * @param {jQuery} $container
-     * @param {Object} styleInfo
-     */
-    this.update = function ($container, styleInfo) {
-      /**
-       * handle dropdown's check mark (for fontname, fontsize, lineHeight).
-       * @param {jQuery} $btn
-       * @param {Number} value
-       */
-      var checkDropdownMenu = function ($btn, value) {
-        $btn.find('.dropdown-menu li a').each(function () {
-          // always compare string to avoid creating another func.
-          var isChecked = ($(this).data('value') + '') === (value + '');
-          this.className = isChecked ? 'checked' : '';
-        });
-      };
-
-      /**
-       * update button state(active or not).
-       *
-       * @private
-       * @param {String} selector
-       * @param {Function} pred
-       */
-      var btnState = function (selector, pred) {
-        var $btn = $container.find(selector);
-        $btn.toggleClass('active', pred());
-      };
-
-      if (styleInfo.image) {
-        var $img = $(styleInfo.image);
-
-        btnState('button[data-event="imageShape"][data-value="img-rounded"]', function () {
-          return $img.hasClass('img-rounded');
-        });
-        btnState('button[data-event="imageShape"][data-value="img-circle"]', function () {
-          return $img.hasClass('img-circle');
-        });
-        btnState('button[data-event="imageShape"][data-value="img-thumbnail"]', function () {
-          return $img.hasClass('img-thumbnail');
-        });
-        btnState('button[data-event="imageShape"]:not([data-value])', function () {
-          return !$img.is('.img-rounded, .img-circle, .img-thumbnail');
-        });
-
-        var imgFloat = $img.css('float');
-        btnState('button[data-event="floatMe"][data-value="left"]', function () {
-          return imgFloat === 'left';
-        });
-        btnState('button[data-event="floatMe"][data-value="right"]', function () {
-          return imgFloat === 'right';
-        });
-        btnState('button[data-event="floatMe"][data-value="none"]', function () {
-          return imgFloat !== 'left' && imgFloat !== 'right';
-        });
-
-        var style = $img.attr('style');
-        btnState('button[data-event="resize"][data-value="1"]', function () {
-          return !!/(^|\s)(max-)?width\s*:\s*100%/.test(style);
-        });
-        btnState('button[data-event="resize"][data-value="0.5"]', function () {
-          return !!/(^|\s)(max-)?width\s*:\s*50%/.test(style);
-        });
-        btnState('button[data-event="resize"][data-value="0.25"]', function () {
-          return !!/(^|\s)(max-)?width\s*:\s*25%/.test(style);
-        });
-        return;
-      }
-
-      // fontname
-      var $fontname = $container.find('.note-fontname');
-      if ($fontname.length) {
-        var selectedFont = styleInfo['font-family'];
-        if (!!selectedFont) {
-
-          var list = selectedFont.split(',');
-          for (var i = 0, len = list.length; i < len; i++) {
-            selectedFont = list[i].replace(/[\'\"]/g, '').replace(/\s+$/, '').replace(/^\s+/, '');
-            if (agent.isFontInstalled(selectedFont)) {
-              break;
-            }
-          }
-          
-          $fontname.find('.note-current-fontname').text(selectedFont);
-          checkDropdownMenu($fontname, selectedFont);
-
-        }
-      }
-
-      // fontsize
-      var $fontsize = $container.find('.note-fontsize');
-      $fontsize.find('.note-current-fontsize').text(styleInfo['font-size']);
-      checkDropdownMenu($fontsize, parseFloat(styleInfo['font-size']));
-
-      // lineheight
-      var $lineHeight = $container.find('.note-height');
-      checkDropdownMenu($lineHeight, parseFloat(styleInfo['line-height']));
-
-      btnState('button[data-event="bold"]', function () {
-        return styleInfo['font-bold'] === 'bold';
-      });
-      btnState('button[data-event="italic"]', function () {
-        return styleInfo['font-italic'] === 'italic';
-      });
-      btnState('button[data-event="underline"]', function () {
-        return styleInfo['font-underline'] === 'underline';
-      });
-      btnState('button[data-event="strikethrough"]', function () {
-        return styleInfo['font-strikethrough'] === 'strikethrough';
-      });
-      btnState('button[data-event="superscript"]', function () {
-        return styleInfo['font-superscript'] === 'superscript';
-      });
-      btnState('button[data-event="subscript"]', function () {
-        return styleInfo['font-subscript'] === 'subscript';
-      });
-      btnState('button[data-event="justifyLeft"]', function () {
-        return styleInfo['text-align'] === 'left' || styleInfo['text-align'] === 'start';
-      });
-      btnState('button[data-event="justifyCenter"]', function () {
-        return styleInfo['text-align'] === 'center';
-      });
-      btnState('button[data-event="justifyRight"]', function () {
-        return styleInfo['text-align'] === 'right';
-      });
-      btnState('button[data-event="justifyFull"]', function () {
-        return styleInfo['text-align'] === 'justify';
-      });
-      btnState('button[data-event="insertUnorderedList"]', function () {
-        return styleInfo['list-style'] === 'unordered';
-      });
-      btnState('button[data-event="insertOrderedList"]', function () {
-        return styleInfo['list-style'] === 'ordered';
-      });
-    };
-
-    /**
-     * update recent color
-     *
-     * @param {Node} button
-     * @param {String} eventName
-     * @param {Mixed} value
-     */
-    this.updateRecentColor = function (button, eventName, value) {
-      var $color = $(button).closest('.note-color');
-      var $recentColor = $color.find('.note-recent-color');
-      var colorInfo = JSON.parse($recentColor.attr('data-value'));
-      colorInfo[eventName] = value;
-      $recentColor.attr('data-value', JSON.stringify(colorInfo));
-      var sKey = eventName === 'backColor' ? 'background-color' : 'color';
-      $recentColor.find('i').css(sKey, value);
-    };
-  };
-
-  /**
-   * @class module.Toolbar
-   *
-   * Toolbar
-   */
-  var Toolbar = function () {
-    var button = new Button();
-
-    this.update = function ($toolbar, styleInfo) {
-      button.update($toolbar, styleInfo);
-    };
-
-    /**
-     * @param {Node} button
-     * @param {String} eventName
-     * @param {String} value
-     */
-    this.updateRecentColor = function (buttonNode, eventName, value) {
-      button.updateRecentColor(buttonNode, eventName, value);
-    };
-
-    /**
-     * activate buttons exclude codeview
-     * @param {jQuery} $toolbar
-     */
-    this.activate = function ($toolbar) {
-      $toolbar.find('button')
-              .not('button[data-event="codeview"]')
-              .removeClass('disabled');
-    };
-
-    /**
-     * deactivate buttons exclude codeview
-     * @param {jQuery} $toolbar
-     */
-    this.deactivate = function ($toolbar) {
-      $toolbar.find('button')
-              .not('button[data-event="codeview"]')
-              .addClass('disabled');
-    };
-
-    /**
-     * @param {jQuery} $container
-     * @param {Boolean} [bFullscreen=false]
-     */
-    this.updateFullscreen = function ($container, bFullscreen) {
-      var $btn = $container.find('button[data-event="fullscreen"]');
-      $btn.toggleClass('active', bFullscreen);
-    };
-
-    /**
-     * @param {jQuery} $container
-     * @param {Boolean} [isCodeview=false]
-     */
-    this.updateCodeview = function ($container, isCodeview) {
-      var $btn = $container.find('button[data-event="codeview"]');
-      $btn.toggleClass('active', isCodeview);
-
-      if (isCodeview) {
-        this.deactivate($container);
-      } else {
-        this.activate($container);
-      }
-    };
-
-    /**
-     * get button in toolbar 
-     *
-     * @param {jQuery} $editable
-     * @param {String} name
-     * @return {jQuery}
-     */
-    this.get = function ($editable, name) {
-      var $toolbar = dom.makeLayoutInfo($editable).toolbar();
-
-      return $toolbar.find('[data-name=' + name + ']');
-    };
-
-    /**
-     * set button state
-     * @param {jQuery} $editable
-     * @param {String} name
-     * @param {Boolean} [isActive=true]
-     */
-    this.setButtonState = function ($editable, name, isActive) {
-      isActive = (isActive === false) ? false : true;
-
-      var $button = this.get($editable, name);
-      $button.toggleClass('active', isActive);
-    };
-  };
-
-  var EDITABLE_PADDING = 24;
-
-  var Statusbar = function () {
-    var $document = $(document);
-
-    this.attach = function (layoutInfo, options) {
-      if (!options.disableResizeEditor) {
-        layoutInfo.statusbar().on('mousedown', hStatusbarMousedown);
-      }
-    };
-
-    /**
-     * `mousedown` event handler on statusbar
-     *
-     * @param {MouseEvent} event
-     */
-    var hStatusbarMousedown = function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      var $editable = dom.makeLayoutInfo(event.target).editable();
-      var editableTop = $editable.offset().top - $document.scrollTop();
-
-      var layoutInfo = dom.makeLayoutInfo(event.currentTarget || event.target);
-      var options = layoutInfo.editor().data('options');
-
-      $document.on('mousemove', function (event) {
-        var nHeight = event.clientY - (editableTop + EDITABLE_PADDING);
-
-        nHeight = (options.minHeight > 0) ? Math.max(nHeight, options.minHeight) : nHeight;
-        nHeight = (options.maxHeight > 0) ? Math.min(nHeight, options.maxHeight) : nHeight;
-
-        $editable.height(nHeight);
-      }).one('mouseup', function () {
-        $document.off('mousemove');
-      });
-    };
-  };
-
-  /**
-   * @class module.Popover
-   *
-   * Popover (http://getbootstrap.com/javascript/#popovers)
-   *
-   */
-  var Popover = function () {
-    var button = new Button();
-
-    /**
-     * returns position from placeholder
-     *
-     * @private
-     * @param {Node} placeholder
-     * @param {Boolean} isAirMode
-     * @return {Object}
-     * @return {Number} return.left
-     * @return {Number} return.top
-     */
-    var posFromPlaceholder = function (placeholder, isAirMode) {
-      var $placeholder = $(placeholder);
-      var pos = isAirMode ? $placeholder.offset() : $placeholder.position();
-      var height = $placeholder.outerHeight(true); // include margin
-
-      // popover below placeholder.
-      return {
-        left: pos.left,
-        top: pos.top + height
-      };
-    };
-
-    /**
-     * show popover
-     *
-     * @private
-     * @param {jQuery} popover
-     * @param {Position} pos
-     */
-    var showPopover = function ($popover, pos) {
-      $popover.css({
-        display: 'block',
-        left: pos.left,
-        top: pos.top
-      });
-    };
-
-    var PX_POPOVER_ARROW_OFFSET_X = 20;
-
-    /**
-     * update current state
-     * @param {jQuery} $popover - popover container
-     * @param {Object} styleInfo - style object
-     * @param {Boolean} isAirMode
-     */
-    this.update = function ($popover, styleInfo, isAirMode) {
-      button.update($popover, styleInfo);
-
-      var $linkPopover = $popover.find('.note-link-popover');
-      if (styleInfo.anchor) {
-        var $anchor = $linkPopover.find('a');
-        var href = $(styleInfo.anchor).attr('href');
-        var target = $(styleInfo.anchor).attr('target');
-        $anchor.attr('href', href).html(href);
-        if (!target) {
-          $anchor.removeAttr('target');
-        } else {
-          $anchor.attr('target', '_blank');
-        }
-        showPopover($linkPopover, posFromPlaceholder(styleInfo.anchor, isAirMode));
-      } else {
-        $linkPopover.hide();
-      }
-
-      var $imagePopover = $popover.find('.note-image-popover');
-      if (styleInfo.image) {
-        showPopover($imagePopover, posFromPlaceholder(styleInfo.image, isAirMode));
-      } else {
-        $imagePopover.hide();
-      }
-
-      var $airPopover = $popover.find('.note-air-popover');
-      if (isAirMode && !styleInfo.range.isCollapsed()) {
-        var rect = list.last(styleInfo.range.getClientRects());
-        if (rect) {
-          var bnd = func.rect2bnd(rect);
-          showPopover($airPopover, {
-            left: Math.max(bnd.left + bnd.width / 2 - PX_POPOVER_ARROW_OFFSET_X, 0),
-            top: bnd.top + bnd.height
-          });
-        }
-      } else {
-        $airPopover.hide();
-      }
-    };
-
-    /**
-     * @param {Node} button
-     * @param {String} eventName
-     * @param {String} value
-     */
-    this.updateRecentColor = function (button, eventName, value) {
-      button.updateRecentColor(button, eventName, value);
-    };
-
-    /**
-     * hide all popovers
-     * @param {jQuery} $popover - popover container
-     */
-    this.hide = function ($popover) {
-      $popover.children().hide();
-    };
-  };
-
-  /**
-   * @class module.Handle
-   *
-   * Handle
-   */
-  var Handle = function (handler) {
-    var $document = $(document);
-
-    /**
-     * `mousedown` event handler on $handle
-     *  - controlSizing: resize image
-     *
-     * @param {MouseEvent} event
-     */
-    var hHandleMousedown = function (event) {
-      if (dom.isControlSizing(event.target)) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        var layoutInfo = dom.makeLayoutInfo(event.target),
-            $handle = layoutInfo.handle(),
-            $popover = layoutInfo.popover(),
-            $editable = layoutInfo.editable(),
-            $editor = layoutInfo.editor();
-
-        var target = $handle.find('.note-control-selection').data('target'),
-            $target = $(target), posStart = $target.offset(),
-            scrollTop = $document.scrollTop();
-
-        var isAirMode = $editor.data('options').airMode;
-
-        $document.on('mousemove', function (event) {
-          handler.invoke('editor.resizeTo', {
-            x: event.clientX - posStart.left,
-            y: event.clientY - (posStart.top - scrollTop)
-          }, $target, !event.shiftKey);
-
-          handler.invoke('handle.update', $handle, {image: target}, isAirMode);
-          handler.invoke('popover.update', $popover, {image: target}, isAirMode);
-        }).one('mouseup', function () {
-          $document.off('mousemove');
-          handler.invoke('editor.afterCommand', $editable);
-        });
-
-        if (!$target.data('ratio')) { // original ratio.
-          $target.data('ratio', $target.height() / $target.width());
-        }
-      }
-    };
-
-    this.attach = function (layoutInfo) {
-      layoutInfo.handle().on('mousedown', hHandleMousedown);
-    };
-
-    /**
-     * update handle
-     * @param {jQuery} $handle
-     * @param {Object} styleInfo
-     * @param {Boolean} isAirMode
-     */
-    this.update = function ($handle, styleInfo, isAirMode) {
-      var $selection = $handle.find('.note-control-selection');
-      if (styleInfo.image) {
-        var $image = $(styleInfo.image);
-        var pos = isAirMode ? $image.offset() : $image.position();
-
-        // include margin
-        var imageSize = {
-          w: $image.outerWidth(true),
-          h: $image.outerHeight(true)
-        };
-
-        $selection.css({
-          display: 'block',
-          left: pos.left,
-          top: pos.top,
-          width: imageSize.w,
-          height: imageSize.h
-        }).data('target', styleInfo.image); // save current image element.
-        var sizingText = imageSize.w + 'x' + imageSize.h;
-        $selection.find('.note-control-selection-info').text(sizingText);
-      } else {
-        $selection.hide();
-      }
-    };
-
-    /**
-     * hide
-     *
-     * @param {jQuery} $handle
-     */
-    this.hide = function ($handle) {
-      $handle.children().hide();
-    };
-  };
-
-  var Fullscreen = function (handler) {
-    var $window = $(window);
-    var $scrollbar = $('html, body');
-
-    /**
-     * toggle fullscreen
-     *
-     * @param {Object} layoutInfo
-     */
-    this.toggle = function (layoutInfo) {
-
-      var $editor = layoutInfo.editor(),
-          $toolbar = layoutInfo.toolbar(),
-          $editable = layoutInfo.editable(),
-          $codable = layoutInfo.codable();
-
-      var resize = function (size) {
-        $editable.css('height', size.h);
-        $codable.css('height', size.h);
-        if ($codable.data('cmeditor')) {
-          $codable.data('cmeditor').setsize(null, size.h);
-        }
-      };
-
-      $editor.toggleClass('fullscreen');
-      var isFullscreen = $editor.hasClass('fullscreen');
-      if (isFullscreen) {
-        $editable.data('orgheight', $editable.css('height'));
-
-        $window.on('resize', function () {
-          resize({
-            h: $window.height() - $toolbar.outerHeight()
-          });
-        }).trigger('resize');
-
-        $scrollbar.css('overflow', 'hidden');
-      } else {
-        $window.off('resize');
-        resize({
-          h: $editable.data('orgheight')
-        });
-        $scrollbar.css('overflow', 'visible');
-      }
-
-      handler.invoke('toolbar.updateFullscreen', $toolbar, isFullscreen);
-    };
-  };
-
-
-  var CodeMirror;
-  if (agent.hasCodeMirror) {
-    if (agent.isSupportAmd) {
-      require(['CodeMirror'], function (cm) {
-        CodeMirror = cm;
-      });
-    } else {
-      CodeMirror = window.CodeMirror;
-    }
-  }
-
-  /**
-   * @class Codeview
-   */
-  var Codeview = function (handler) {
-
-    this.sync = function (layoutInfo) {
-      var isCodeview = handler.invoke('codeview.isActivated', layoutInfo);
-      if (isCodeview && agent.hasCodeMirror) {
-        layoutInfo.codable().data('cmEditor').save();
-      }
-    };
-
-    /**
-     * @param {Object} layoutInfo
-     * @return {Boolean}
-     */
-    this.isActivated = function (layoutInfo) {
-      var $editor = layoutInfo.editor();
-      return $editor.hasClass('codeview');
-    };
-
-    /**
-     * toggle codeview
-     *
-     * @param {Object} layoutInfo
-     */
-    this.toggle = function (layoutInfo) {
-      if (this.isActivated(layoutInfo)) {
-        this.deactivate(layoutInfo);
-      } else {
-        this.activate(layoutInfo);
-      }
-    };
-
-    /**
-     * activate code view
-     *
-     * @param {Object} layoutInfo
-     */
-    this.activate = function (layoutInfo) {
-      var $editor = layoutInfo.editor(),
-          $toolbar = layoutInfo.toolbar(),
-          $editable = layoutInfo.editable(),
-          $codable = layoutInfo.codable(),
-          $popover = layoutInfo.popover(),
-          $handle = layoutInfo.handle();
-
-      var options = $editor.data('options');
-
-      $codable.val(dom.html($editable, options.prettifyHtml));
-      $codable.height($editable.height());
-
-      handler.invoke('toolbar.updateCodeview', $toolbar, true);
-      handler.invoke('popover.hide', $popover);
-      handler.invoke('handle.hide', $handle);
-
-      $editor.addClass('codeview');
-
-      $codable.focus();
-
-      // activate CodeMirror as codable
-      if (agent.hasCodeMirror) {
-        var cmEditor = CodeMirror.fromTextArea($codable[0], options.codemirror);
-
-        // CodeMirror TernServer
-        if (options.codemirror.tern) {
-          var server = new CodeMirror.TernServer(options.codemirror.tern);
-          cmEditor.ternServer = server;
-          cmEditor.on('cursorActivity', function (cm) {
-            server.updateArgHints(cm);
-          });
-        }
-
-        // CodeMirror hasn't Padding.
-        cmEditor.setSize(null, $editable.outerHeight());
-        $codable.data('cmEditor', cmEditor);
-      }
-    };
-
-    /**
-     * deactivate code view
-     *
-     * @param {Object} layoutInfo
-     */
-    this.deactivate = function (layoutInfo) {
-      var $holder = layoutInfo.holder(),
-          $editor = layoutInfo.editor(),
-          $toolbar = layoutInfo.toolbar(),
-          $editable = layoutInfo.editable(),
-          $codable = layoutInfo.codable();
-
-      var options = $editor.data('options');
-
-      // deactivate CodeMirror as codable
-      if (agent.hasCodeMirror) {
-        var cmEditor = $codable.data('cmEditor');
-        $codable.val(cmEditor.getValue());
-        cmEditor.toTextArea();
-      }
-
-      var value = dom.value($codable, options.prettifyHtml) || dom.emptyPara;
-      var isChange = $editable.html() !== value;
-
-      $editable.html(value);
-      $editable.height(options.height ? $codable.height() : 'auto');
-      $editor.removeClass('codeview');
-
-      if (isChange) {
-        handler.bindCustomEvent(
-          $holder, $editable.data('callbacks'), 'change'
-        )($editable.html(), $editable);
-      }
-
-      $editable.focus();
-
-      handler.invoke('toolbar.updateCodeview', $toolbar, false);
-    };
-  };
-
-  var DragAndDrop = function (handler) {
-    var $document = $(document);
-
-    /**
-     * attach Drag and Drop Events
-     *
-     * @param {Object} layoutInfo - layout Informations
-     * @param {Object} options
-     */
-    this.attach = function (layoutInfo, options) {
-      if (options.airMode || options.disableDragAndDrop) {
-        // prevent default drop event
-        $document.on('drop', function (e) {
-          e.preventDefault();
-        });
-      } else {
-        this.attachDragAndDropEvent(layoutInfo, options);
-      }
-    };
-
-    /**
-     * attach Drag and Drop Events
-     *
-     * @param {Object} layoutInfo - layout Informations
-     * @param {Object} options
-     */
-    this.attachDragAndDropEvent = function (layoutInfo, options) {
-      var collection = $(),
-          $editor = layoutInfo.editor(),
-          $dropzone = layoutInfo.dropzone(),
-          $dropzoneMessage = $dropzone.find('.note-dropzone-message');
-
-      // show dropzone on dragenter when dragging a object to document
-      // -but only if the editor is visible, i.e. has a positive width and height
-      $document.on('dragenter', function (e) {
-        var isCodeview = handler.invoke('codeview.isActivated', layoutInfo);
-        var hasEditorSize = $editor.width() > 0 && $editor.height() > 0;
-        if (!isCodeview && !collection.length && hasEditorSize) {
-          $editor.addClass('dragover');
-          $dropzone.width($editor.width());
-          $dropzone.height($editor.height());
-          $dropzoneMessage.text(options.langInfo.image.dragImageHere);
-        }
-        collection = collection.add(e.target);
-      }).on('dragleave', function (e) {
-        collection = collection.not(e.target);
-        if (!collection.length) {
-          $editor.removeClass('dragover');
-        }
-      }).on('drop', function () {
-        collection = $();
-        $editor.removeClass('dragover');
-      });
-
-      // change dropzone's message on hover.
-      $dropzone.on('dragenter', function () {
-        $dropzone.addClass('hover');
-        $dropzoneMessage.text(options.langInfo.image.dropImage);
-      }).on('dragleave', function () {
-        $dropzone.removeClass('hover');
-        $dropzoneMessage.text(options.langInfo.image.dragImageHere);
-      });
-
-      // attach dropImage
-      $dropzone.on('drop', function (event) {
-        event.preventDefault();
-
-        var dataTransfer = event.originalEvent.dataTransfer;
-        var html = dataTransfer.getData('text/html');
-        var text = dataTransfer.getData('text/plain');
-
-        var layoutInfo = dom.makeLayoutInfo(event.currentTarget || event.target);
-
-        if (dataTransfer && dataTransfer.files && dataTransfer.files.length) {
-          layoutInfo.editable().focus();
-          handler.insertImages(layoutInfo, dataTransfer.files);
-        } else if (html) {
-          $(html).each(function () {
-            layoutInfo.editable().focus();
-            handler.invoke('editor.insertNode', layoutInfo.editable(), this);
-          });
-        } else if (text) {
-          layoutInfo.editable().focus();
-          handler.invoke('editor.insertText', layoutInfo.editable(), text);
-        }
-      }).on('dragover', false); // prevent default dragover event
-    };
-  };
-
-  var Clipboard = function (handler) {
-
-    this.attach = function (layoutInfo) {
-      layoutInfo.editable().on('paste', hPasteClipboardImage);
-    };
-
-    /**
-     * paste clipboard image
-     *
-     * @param {Event} event
-     */
-    var hPasteClipboardImage = function (event) {
-      var clipboardData = event.originalEvent.clipboardData;
-      var layoutInfo = dom.makeLayoutInfo(event.currentTarget || event.target);
-      var $editable = layoutInfo.editable();
-
-      if (!clipboardData || !clipboardData.items || !clipboardData.items.length) {
-        var callbacks = $editable.data('callbacks');
-        // only can run if it has onImageUpload method
-        if (!callbacks.onImageUpload) {
-          return;
-        }
-
-        // save cursor
-        handler.invoke('editor.saveNode', $editable);
-        handler.invoke('editor.saveRange', $editable);
-
-        $editable.html('');
-
-        setTimeout(function () {
-          var $img = $editable.find('img');
-
-          // if img is no in clipboard, insert text or dom
-          if (!$img.length || $img[0].src.indexOf('data:') === -1) {
-            var html = $editable.html();
-
-            handler.invoke('editor.restoreNode', $editable);
-            handler.invoke('editor.restoreRange', $editable);
-
-            handler.invoke('editor.focus', $editable);
-            try {
-              handler.invoke('editor.pasteHTML', $editable, html);
-            } catch (ex) {
-              handler.invoke('editor.insertText', $editable, html);
-            }
-            return;
-          }
-
-          var datauri = $img[0].src;
-
-          var data = atob(datauri.split(',')[1]);
-          var array = new Uint8Array(data.length);
-          for (var i = 0; i < data.length; i++) {
-            array[i] = data.charCodeAt(i);
-          }
-
-          var blob = new Blob([array], { type : 'image/png' });
-          blob.name = 'clipboard.png';
-
-          handler.invoke('editor.restoreNode', $editable);
-          handler.invoke('editor.restoreRange', $editable);
-          handler.insertImages(layoutInfo, [blob]);
-
-          handler.invoke('editor.afterCommand', $editable);
-        }, 0);
-
-        return;
-      }
-
-      var item = list.head(clipboardData.items);
-      var isClipboardImage = item.kind === 'file' && item.type.indexOf('image/') !== -1;
-
-      if (isClipboardImage) {
-        handler.insertImages(layoutInfo, [item.getAsFile()]);
-      }
-
-      handler.invoke('editor.afterCommand', $editable);
-    };
-  };
-
-  var LinkDialog = function (handler) {
-
-    /**
-     * toggle button status
-     *
-     * @private
-     * @param {jQuery} $btn
-     * @param {Boolean} isEnable
-     */
-    var toggleBtn = function ($btn, isEnable) {
-      $btn.toggleClass('disabled', !isEnable);
-      $btn.attr('disabled', !isEnable);
-    };
-
-    /**
-     * bind enter key
-     *
-     * @private
-     * @param {jQuery} $input
-     * @param {jQuery} $btn
-     */
-    var bindEnterKey = function ($input, $btn) {
-      $input.on('keypress', function (event) {
-        if (event.keyCode === key.code.ENTER) {
-          $btn.trigger('click');
-        }
-      });
-    };
-
-    /**
-     * Show link dialog and set event handlers on dialog controls.
-     *
-     * @param {jQuery} $editable
-     * @param {jQuery} $dialog
-     * @param {Object} linkInfo
-     * @return {Promise}
-     */
-    this.showLinkDialog = function ($editable, $dialog, linkInfo) {
-      return $.Deferred(function (deferred) {
-        var $linkDialog = $dialog.find('.note-link-dialog');
-
-        var $linkText = $linkDialog.find('.note-link-text'),
-        $linkUrl = $linkDialog.find('.note-link-url'),
-        $linkBtn = $linkDialog.find('.note-link-btn'),
-        $openInNewWindow = $linkDialog.find('input[type=checkbox]');
-
-        $linkDialog.one('shown.bs.modal', function () {
-          $linkText.val(linkInfo.text);
-
-          $linkText.on('input', function () {
-            // if linktext was modified by keyup,
-            // stop cloning text from linkUrl
-            linkInfo.text = $linkText.val();
-          });
-
-          // if no url was given, copy text to url
-          if (!linkInfo.url) {
-            linkInfo.url = linkInfo.text;
-            toggleBtn($linkBtn, linkInfo.text);
-          }
-
-          $linkUrl.on('input', function () {
-            toggleBtn($linkBtn, $linkUrl.val());
-            // display same link on `Text to display` input
-            // when create a new link
-            if (!linkInfo.text) {
-              $linkText.val($linkUrl.val());
-            }
-          }).val(linkInfo.url).trigger('focus').trigger('select');
-
-          bindEnterKey($linkUrl, $linkBtn);
-          bindEnterKey($linkText, $linkBtn);
-
-          $openInNewWindow.prop('checked', linkInfo.newWindow);
-
-          $linkBtn.one('click', function (event) {
-            event.preventDefault();
-
-            deferred.resolve({
-              range: linkInfo.range,
-              url: $linkUrl.val(),
-              text: $linkText.val(),
-              newWindow: $openInNewWindow.is(':checked')
-            });
-            $linkDialog.modal('hide');
-          });
-        }).one('hidden.bs.modal', function () {
-          // detach events
-          $linkText.off('input keypress');
-          $linkUrl.off('input keypress');
-          $linkBtn.off('click');
-
-          if (deferred.state() === 'pending') {
-            deferred.reject();
-          }
-        }).modal('show');
-      }).promise();
-    };
-
-    /**
-     * @param {Object} layoutInfo
-     */
-    this.show = function (layoutInfo) {
-      var $editor = layoutInfo.editor(),
-          $dialog = layoutInfo.dialog(),
-          $editable = layoutInfo.editable(),
-          $popover = layoutInfo.popover(),
-          linkInfo = handler.invoke('editor.getLinkInfo', $editable);
-
-      var options = $editor.data('options');
-
-      handler.invoke('editor.saveRange', $editable);
-      this.showLinkDialog($editable, $dialog, linkInfo).then(function (linkInfo) {
-        handler.invoke('editor.restoreRange', $editable);
-        handler.invoke('editor.createLink', $editable, linkInfo, options);
-        // hide popover after creating link
-        handler.invoke('popover.hide', $popover);
-      }).fail(function () {
-        handler.invoke('editor.restoreRange', $editable);
-      });
-    };
-  };
-
-  var ImageDialog = function (handler) {
-    /**
-     * toggle button status
-     *
-     * @private
-     * @param {jQuery} $btn
-     * @param {Boolean} isEnable
-     */
-    var toggleBtn = function ($btn, isEnable) {
-      $btn.toggleClass('disabled', !isEnable);
-      $btn.attr('disabled', !isEnable);
-    };
-
-    /**
-     * bind enter key
-     *
-     * @private
-     * @param {jQuery} $input
-     * @param {jQuery} $btn
-     */
-    var bindEnterKey = function ($input, $btn) {
-      $input.on('keypress', function (event) {
-        if (event.keyCode === key.code.ENTER) {
-          $btn.trigger('click');
-        }
-      });
-    };
-
-    this.show = function (layoutInfo) {
-      var $dialog = layoutInfo.dialog(),
-          $editable = layoutInfo.editable();
-
-      handler.invoke('editor.saveRange', $editable);
-      this.showImageDialog($editable, $dialog).then(function (data) {
-        handler.invoke('editor.restoreRange', $editable);
-
-        if (typeof data === 'string') {
-          // image url
-          handler.invoke('editor.insertImage', $editable, data);
-        } else {
-          // array of files
-          handler.insertImages(layoutInfo, data);
-        }
-      }).fail(function () {
-        handler.invoke('editor.restoreRange', $editable);
-      });
-    };
-
-    /**
-     * show image dialog
-     *
-     * @param {jQuery} $editable
-     * @param {jQuery} $dialog
-     * @return {Promise}
-     */
-    this.showImageDialog = function ($editable, $dialog) {
-      return $.Deferred(function (deferred) {
-        var $imageDialog = $dialog.find('.note-image-dialog');
-
-        var $imageInput = $dialog.find('.note-image-input'),
-            $imageUrl = $dialog.find('.note-image-url'),
-            $imageBtn = $dialog.find('.note-image-btn');
-
-        $imageDialog.one('shown.bs.modal', function () {
-          // Cloning imageInput to clear element.
-          $imageInput.replaceWith($imageInput.clone()
-            .on('change', function () {
-              deferred.resolve(this.files || this.value);
-              $imageDialog.modal('hide');
-            })
-            .val('')
-          );
-
-          $imageBtn.click(function (event) {
-            event.preventDefault();
-
-            deferred.resolve($imageUrl.val());
-            $imageDialog.modal('hide');
-          });
-
-          $imageUrl.on('keyup paste', function (event) {
-            var url;
-            
-            if (event.type === 'paste') {
-              url = event.originalEvent.clipboardData.getData('text');
-            } else {
-              url = $imageUrl.val();
-            }
-            
-            toggleBtn($imageBtn, url);
-          }).val('').trigger('focus');
-          bindEnterKey($imageUrl, $imageBtn);
-        }).one('hidden.bs.modal', function () {
-          $imageInput.off('change');
-          $imageUrl.off('keyup paste keypress');
-          $imageBtn.off('click');
-
-          if (deferred.state() === 'pending') {
-            deferred.reject();
-          }
-        }).modal('show');
-      });
-    };
-  };
-
-  var HelpDialog = function (handler) {
-    /**
-     * show help dialog
-     *
-     * @param {jQuery} $editable
-     * @param {jQuery} $dialog
-     * @return {Promise}
-     */
-    this.showHelpDialog = function ($editable, $dialog) {
-      return $.Deferred(function (deferred) {
-        var $helpDialog = $dialog.find('.note-help-dialog');
-
-        $helpDialog.one('hidden.bs.modal', function () {
-          deferred.resolve();
-        }).modal('show');
-      }).promise();
-    };
-
-    /**
-     * @param {Object} layoutInfo
-     */
-    this.show = function (layoutInfo) {
-      var $dialog = layoutInfo.dialog(),
-          $editable = layoutInfo.editable();
-
-      handler.invoke('editor.saveRange', $editable, true);
-      this.showHelpDialog($editable, $dialog).then(function () {
-        handler.invoke('editor.restoreRange', $editable);
-      });
-    };
-  };
-
-
-  /**
-   * @class EventHandler
-   *
-   * EventHandler
-   *  - TODO: new instance per a editor
-   */
-  var EventHandler = function () {
-    /**
-     * Modules
-     */
-    var modules = this.modules = {
-      editor: new Editor(this),
-      toolbar: new Toolbar(this),
-      statusbar: new Statusbar(this),
-      popover: new Popover(this),
-      handle: new Handle(this),
-      fullscreen: new Fullscreen(this),
-      codeview: new Codeview(this),
-      dragAndDrop: new DragAndDrop(this),
-      clipboard: new Clipboard(this),
-      linkDialog: new LinkDialog(this),
-      imageDialog: new ImageDialog(this),
-      helpDialog: new HelpDialog(this)
-    };
-
-    /**
-     * invoke module's method
-     *
-     * @param {String} moduleAndMethod - ex) 'editor.redo'
-     * @param {...*} arguments - arguments of method
-     * @return {*}
-     */
-    this.invoke = function () {
-      var moduleAndMethod = list.head(list.from(arguments));
-      var args = list.tail(list.from(arguments));
-
-      var splits = moduleAndMethod.split('.');
-      var hasSeparator = splits.length > 1;
-      var moduleName = hasSeparator && list.head(splits);
-      var methodName = hasSeparator ? list.last(splits) : list.head(splits);
-
-      var module = this.getModule(moduleName);
-      var method = module[methodName];
-
-      return method && method.apply(module, args);
-    };
-
-    /**
-     * returns module
-     *
-     * @param {String} moduleName - name of module
-     * @return {Module} - defaults is editor
-     */
-    this.getModule = function (moduleName) {
-      return this.modules[moduleName] || this.modules.editor;
-    };
-
-    /**
-     * @param {jQuery} $holder
-     * @param {Object} callbacks
-     * @param {String} eventNamespace
-     * @returns {Function}
-     */
-    var bindCustomEvent = this.bindCustomEvent = function ($holder, callbacks, eventNamespace) {
-      return function () {
-        var callback = callbacks[func.namespaceToCamel(eventNamespace, 'on')];
-        if (callback) {
-          callback.apply($holder[0], arguments);
-        }
-        return $holder.trigger('summernote.' + eventNamespace, arguments);
-      };
-    };
-
-    /**
-     * insert Images from file array.
-     *
-     * @private
-     * @param {Object} layoutInfo
-     * @param {File[]} files
-     */
-    this.insertImages = function (layoutInfo, files) {
-      var $editor = layoutInfo.editor(),
-          $editable = layoutInfo.editable(),
-          $holder = layoutInfo.holder();
-
-      var callbacks = $editable.data('callbacks');
-      var options = $editor.data('options');
-
-      // If onImageUpload options setted
-      if (callbacks.onImageUpload) {
-        bindCustomEvent($holder, callbacks, 'image.upload')(files);
-      // else insert Image as dataURL
-      } else {
-        $.each(files, function (idx, file) {
-          var filename = file.name;
-          if (options.maximumImageFileSize && options.maximumImageFileSize < file.size) {
-            bindCustomEvent($holder, callbacks, 'image.upload.error')(options.langInfo.image.maximumFileSizeError);
-          } else {
-            async.readFileAsDataURL(file).then(function (sDataURL) {
-              modules.editor.insertImage($editable, sDataURL, filename);
-            }).fail(function () {
-              bindCustomEvent($holder, callbacks, 'image.upload.error')(options.langInfo.image.maximumFileSizeError);
-            });
-          }
-        });
-      }
-    };
-
-    var commands = {
-      /**
-       * @param {Object} layoutInfo
-       */
-      showLinkDialog: function (layoutInfo) {
-        modules.linkDialog.show(layoutInfo);
-      },
-
-      /**
-       * @param {Object} layoutInfo
-       */
-      showImageDialog: function (layoutInfo) {
-        modules.imageDialog.show(layoutInfo);
-      },
-
-      /**
-       * @param {Object} layoutInfo
-       */
-      showHelpDialog: function (layoutInfo) {
-        modules.helpDialog.show(layoutInfo);
-      },
-
-      /**
-       * @param {Object} layoutInfo
-       */
-      fullscreen: function (layoutInfo) {
-        modules.fullscreen.toggle(layoutInfo);
-      },
-
-      /**
-       * @param {Object} layoutInfo
-       */
-      codeview: function (layoutInfo) {
-        modules.codeview.toggle(layoutInfo);
-      }
-    };
-
-    var hMousedown = function (event) {
-      //preventDefault Selection for FF, IE8+
-      if (dom.isImg(event.target)) {
-        event.preventDefault();
-      }
-    };
-
-    var hToolbarAndPopoverUpdate = function (event) {
-      // delay for range after mouseup
-      setTimeout(function () {
-        var layoutInfo = dom.makeLayoutInfo(event.currentTarget || event.target);
-        var styleInfo = modules.editor.currentStyle(event.target);
-        if (!styleInfo) { return; }
-
-        var isAirMode = layoutInfo.editor().data('options').airMode;
-        if (!isAirMode) {
-          modules.toolbar.update(layoutInfo.toolbar(), styleInfo);
-        }
-
-        modules.popover.update(layoutInfo.popover(), styleInfo, isAirMode);
-        modules.handle.update(layoutInfo.handle(), styleInfo, isAirMode);
-      }, 0);
-    };
-
-    var hScroll = function (event) {
-      var layoutInfo = dom.makeLayoutInfo(event.currentTarget || event.target);
-      //hide popover and handle when scrolled
-      modules.popover.hide(layoutInfo.popover());
-      modules.handle.hide(layoutInfo.handle());
-    };
-
-    var hToolbarAndPopoverMousedown = function (event) {
-      // prevent default event when insertTable (FF, Webkit)
-      var $btn = $(event.target).closest('[data-event]');
-      if ($btn.length) {
-        event.preventDefault();
-      }
-    };
-
-    var hToolbarAndPopoverClick = function (event) {
-      var $btn = $(event.target).closest('[data-event]');
-
-      if ($btn.length) {
-        var eventName = $btn.attr('data-event'),
-            value = $btn.attr('data-value'),
-            hide = $btn.attr('data-hide');
-
-        var layoutInfo = dom.makeLayoutInfo(event.target);
-
-        // before command: detect control selection element($target)
-        var $target;
-        if ($.inArray(eventName, ['resize', 'floatMe', 'removeMedia', 'imageShape']) !== -1) {
-          var $selection = layoutInfo.handle().find('.note-control-selection');
-          $target = $($selection.data('target'));
-        }
-
-        // If requested, hide the popover when the button is clicked.
-        // Useful for things like showHelpDialog.
-        if (hide) {
-          $btn.parents('.popover').hide();
-        }
-
-        if ($.isFunction($.summernote.pluginEvents[eventName])) {
-          $.summernote.pluginEvents[eventName](event, modules.editor, layoutInfo, value);
-        } else if (modules.editor[eventName]) { // on command
-          var $editable = layoutInfo.editable();
-          $editable.focus();
-          modules.editor[eventName]($editable, value, $target);
-          event.preventDefault();
-        } else if (commands[eventName]) {
-          commands[eventName].call(this, layoutInfo);
-          event.preventDefault();
-        }
-
-        // after command
-        if ($.inArray(eventName, ['backColor', 'foreColor']) !== -1) {
-          var options = layoutInfo.editor().data('options', options);
-          var module = options.airMode ? modules.popover : modules.toolbar;
-          module.updateRecentColor(list.head($btn), eventName, value);
-        }
-
-        hToolbarAndPopoverUpdate(event);
-      }
-    };
-
-    var PX_PER_EM = 18;
-    var hDimensionPickerMove = function (event, options) {
-      var $picker = $(event.target.parentNode); // target is mousecatcher
-      var $dimensionDisplay = $picker.next();
-      var $catcher = $picker.find('.note-dimension-picker-mousecatcher');
-      var $highlighted = $picker.find('.note-dimension-picker-highlighted');
-      var $unhighlighted = $picker.find('.note-dimension-picker-unhighlighted');
-
-      var posOffset;
-      // HTML5 with jQuery - e.offsetX is undefined in Firefox
-      if (event.offsetX === undefined) {
-        var posCatcher = $(event.target).offset();
-        posOffset = {
-          x: event.pageX - posCatcher.left,
-          y: event.pageY - posCatcher.top
-        };
-      } else {
-        posOffset = {
-          x: event.offsetX,
-          y: event.offsetY
-        };
-      }
-
-      var dim = {
-        c: Math.ceil(posOffset.x / PX_PER_EM) || 1,
-        r: Math.ceil(posOffset.y / PX_PER_EM) || 1
-      };
-
-      $highlighted.css({ width: dim.c + 'em', height: dim.r + 'em' });
-      $catcher.attr('data-value', dim.c + 'x' + dim.r);
-
-      if (3 < dim.c && dim.c < options.insertTableMaxSize.col) {
-        $unhighlighted.css({ width: dim.c + 1 + 'em'});
-      }
-
-      if (3 < dim.r && dim.r < options.insertTableMaxSize.row) {
-        $unhighlighted.css({ height: dim.r + 1 + 'em'});
-      }
-
-      $dimensionDisplay.html(dim.c + ' x ' + dim.r);
-    };
-    
-    /**
-     * bind KeyMap on keydown
-     *
-     * @param {Object} layoutInfo
-     * @param {Object} keyMap
-     */
-    this.bindKeyMap = function (layoutInfo, keyMap) {
-      var $editor = layoutInfo.editor();
-      var $editable = layoutInfo.editable();
-
-      $editable.on('keydown', function (event) {
-        var keys = [];
-
-        // modifier
-        if (event.metaKey) { keys.push('CMD'); }
-        if (event.ctrlKey && !event.altKey) { keys.push('CTRL'); }
-        if (event.shiftKey) { keys.push('SHIFT'); }
-
-        // keycode
-        var keyName = key.nameFromCode[event.keyCode];
-        if (keyName) {
-          keys.push(keyName);
-        }
-
-        var eventName = keyMap[keys.join('+')];
-        if (eventName) {
-          if ($.summernote.pluginEvents[eventName]) {
-            var plugin = $.summernote.pluginEvents[eventName];
-            if ($.isFunction(plugin)) {
-              plugin(event, modules.editor, layoutInfo);
-            }
-          } else if (modules.editor[eventName]) {
-            modules.editor[eventName]($editable, $editor.data('options'));
-            event.preventDefault();
-          } else if (commands[eventName]) {
-            commands[eventName].call(this, layoutInfo);
-            event.preventDefault();
-          }
-        } else if (key.isEdit(event.keyCode)) {
-          modules.editor.afterCommand($editable);
-        }
-      });
-    };
-
-    /**
-     * attach eventhandler
-     *
-     * @param {Object} layoutInfo - layout Informations
-     * @param {Object} options - user options include custom event handlers
-     */
-    this.attach = function (layoutInfo, options) {
-      // handlers for editable
-      if (options.shortcuts) {
-        this.bindKeyMap(layoutInfo, options.keyMap[agent.isMac ? 'mac' : 'pc']);
-      }
-      layoutInfo.editable().on('mousedown', hMousedown);
-      layoutInfo.editable().on('keyup mouseup', hToolbarAndPopoverUpdate);
-      layoutInfo.editable().on('scroll', hScroll);
-      modules.clipboard.attach(layoutInfo, options);
-
-      // handler for handle and popover
-      modules.handle.attach(layoutInfo, options);
-      layoutInfo.popover().on('click', hToolbarAndPopoverClick);
-      layoutInfo.popover().on('mousedown', hToolbarAndPopoverMousedown);
-
-      // handler for drag and drop
-      modules.dragAndDrop.attach(layoutInfo, options);
-
-      // handlers for frame mode (toolbar, statusbar)
-      if (!options.airMode) {
-        // handler for toolbar
-        layoutInfo.toolbar().on('click', hToolbarAndPopoverClick);
-        layoutInfo.toolbar().on('mousedown', hToolbarAndPopoverMousedown);
-
-        // handler for statusbar
-        modules.statusbar.attach(layoutInfo, options);
-      }
-
-      // handler for table dimension
-      var $catcherContainer = options.airMode ? layoutInfo.popover() :
-                                                layoutInfo.toolbar();
-      var $catcher = $catcherContainer.find('.note-dimension-picker-mousecatcher');
-      $catcher.css({
-        width: options.insertTableMaxSize.col + 'em',
-        height: options.insertTableMaxSize.row + 'em'
-      }).on('mousemove', function (event) {
-        hDimensionPickerMove(event, options);
-      });
-
-      // save options on editor
-      layoutInfo.editor().data('options', options);
-
-      // ret styleWithCSS for backColor / foreColor clearing with 'inherit'.
-      if (!agent.isMSIE) {
-        // [workaround] for Firefox
-        //  - protect FF Error: NS_ERROR_FAILURE: Failure
-        setTimeout(function () {
-          document.execCommand('styleWithCSS', 0, options.styleWithSpan);
-        }, 0);
-      }
-
-      // History
-      var history = new History(layoutInfo.editable());
-      layoutInfo.editable().data('NoteHistory', history);
-
-      // All editor status will be saved on editable with jquery's data
-      // for support multiple editor with singleton object.
-      layoutInfo.editable().data('callbacks', {
-        onInit: options.onInit,
-        onFocus: options.onFocus,
-        onBlur: options.onBlur,
-        onKeydown: options.onKeydown,
-        onKeyup: options.onKeyup,
-        onMousedown: options.onMousedown,
-        onEnter: options.onEnter,
-        onPaste: options.onPaste,
-        onBeforeCommand: options.onBeforeCommand,
-        onChange: options.onChange,
-        onImageUpload: options.onImageUpload,
-        onImageUploadError: options.onImageUploadError,
-        onMediaDelete : options.onMediaDelete
-      });
-
-      // Textarea: auto filling the code before form submit.
-      if (dom.isTextarea(list.head(layoutInfo.holder()))) {
-        layoutInfo.holder().closest('form').submit(function () {
-          var contents = layoutInfo.holder().code();
-          layoutInfo.holder().val(contents);
-
-          // callback on submit
-          if (options.onsubmit) {
-            options.onsubmit(contents);
-          }
-        });
-      }
-    };
-
-    /**
-     * attach jquery custom event
-     *
-     * @param {Object} layoutInfo - layout Informations
-     */
-    this.attachCustomEvent = function (layoutInfo, options) {
-      var $holder = layoutInfo.holder();
-      var $editable = layoutInfo.editable();
-      var callbacks = $editable.data('callbacks');
-
-      $editable.focus(bindCustomEvent($holder, callbacks, 'focus'));
-      $editable.blur(bindCustomEvent($holder, callbacks, 'blur'));
-
-      $editable.keydown(function (event) {
-        if (event.keyCode === key.code.ENTER) {
-          bindCustomEvent($holder, callbacks, 'enter').call(this, event);
-        }
-        bindCustomEvent($holder, callbacks, 'keydown').call(this, event);
-      });
-      $editable.keyup(bindCustomEvent($holder, callbacks, 'keyup'));
-
-      $editable.on('mousedown', bindCustomEvent($holder, callbacks, 'mousedown'));
-      $editable.on('mouseup', bindCustomEvent($holder, callbacks, 'mouseup'));
-      $editable.on('scroll', bindCustomEvent($holder, callbacks, 'scroll'));
-
-      $editable.on('paste', bindCustomEvent($holder, callbacks, 'paste'));
-      
-      // [workaround] for old IE - IE8 don't have input events
-      //  - TODO check IE version
-      var changeEventName = agent.isMSIE ? 'DOMCharacterDataModified DOMSubtreeModified DOMNodeInserted' : 'input';
-      $editable.on(changeEventName, function () {
-        bindCustomEvent($holder, callbacks, 'change')($editable.html(), $editable);
-      });
-
-      // callbacks for advanced features (camel)
-      if (!options.airMode) {
-        layoutInfo.toolbar().click(bindCustomEvent($holder, callbacks, 'toolbar.click'));
-        layoutInfo.popover().click(bindCustomEvent($holder, callbacks, 'popover.click'));
-      }
-
-      // Textarea: auto filling the code before form submit.
-      if (dom.isTextarea(list.head($holder))) {
-        $holder.closest('form').submit(function (e) {
-          bindCustomEvent($holder, callbacks, 'submit').call(this, e, $holder.code());
-        });
-      }
-
-      // fire init event
-      bindCustomEvent($holder, callbacks, 'init')(layoutInfo);
-
-      // fire plugin init event
-      for (var i = 0, len = $.summernote.plugins.length; i < len; i++) {
-        if ($.isFunction($.summernote.plugins[i].init)) {
-          $.summernote.plugins[i].init(layoutInfo);
-        }
-      }
-    };
-      
-    this.detach = function (layoutInfo, options) {
-      layoutInfo.holder().off();
-      layoutInfo.editable().off();
-
-      layoutInfo.popover().off();
-      layoutInfo.handle().off();
-      layoutInfo.dialog().off();
-
-      if (!options.airMode) {
-        layoutInfo.dropzone().off();
-        layoutInfo.toolbar().off();
-        layoutInfo.statusbar().off();
-      }
-    };
-  };
-
-  /**
-   * @class Renderer
-   *
-   * renderer
-   *
-   * rendering toolbar and editable
-   */
-  var Renderer = function () {
-
-    /**
-     * bootstrap button template
-     * @private
-     * @param {String} label button name
-     * @param {Object} [options] button options
-     * @param {String} [options.event] data-event
-     * @param {String} [options.className] button's class name
-     * @param {String} [options.value] data-value
-     * @param {String} [options.title] button's title for popup
-     * @param {String} [options.dropdown] dropdown html
-     * @param {String} [options.hide] data-hide
-     */
-    var tplButton = function (label, options) {
-      var event = options.event;
-      var value = options.value;
-      var title = options.title;
-      var className = options.className;
-      var dropdown = options.dropdown;
-      var hide = options.hide;
-
-      return '<button type="button"' +
-                 ' class="btn btn-default btn-sm btn-small' +
-                   (className ? ' ' + className : '') +
-                   (dropdown ? ' dropdown-toggle' : '') +
-                 '"' +
-                 (dropdown ? ' data-toggle="dropdown"' : '') +
-                 (title ? ' title="' + title + '"' : '') +
-                 (event ? ' data-event="' + event + '"' : '') +
-                 (value ? ' data-value=\'' + value + '\'' : '') +
-                 (hide ? ' data-hide=\'' + hide + '\'' : '') +
-                 ' tabindex="-1">' +
-               label +
-               (dropdown ? ' <span class="caret"></span>' : '') +
-             '</button>' +
-             (dropdown || '');
-    };
-
-    /**
-     * bootstrap icon button template
-     * @private
-     * @param {String} iconClassName
-     * @param {Object} [options]
-     * @param {String} [options.event]
-     * @param {String} [options.value]
-     * @param {String} [options.title]
-     * @param {String} [options.dropdown]
-     */
-    var tplIconButton = function (iconClassName, options) {
-      var label = '<i class="' + iconClassName + '"></i>';
-      return tplButton(label, options);
-    };
-
-    /**
-     * bootstrap popover template
-     * @private
-     * @param {String} className
-     * @param {String} content
-     */
-    var tplPopover = function (className, content) {
-      var $popover = $('<div class="' + className + ' popover bottom in" style="display: none;">' +
-               '<div class="arrow"></div>' +
-               '<div class="popover-content">' +
-               '</div>' +
-             '</div>');
-      
-      $popover.find('.popover-content').append(content);
-      return $popover;
-    };
-
-    /**
-     * bootstrap dialog template
-     *
-     * @param {String} className
-     * @param {String} [title='']
-     * @param {String} body
-     * @param {String} [footer='']
-     */
-    var tplDialog = function (className, title, body, footer) {
-      return '<div class="' + className + ' modal" aria-hidden="false">' +
-               '<div class="modal-dialog">' +
-                 '<div class="modal-content">' +
-                   (title ?
-                   '<div class="modal-header">' +
-                     '<button type="button" class="close" aria-hidden="true" tabindex="-1">&times;</button>' +
-                     '<h4 class="modal-title">' + title + '</h4>' +
-                   '</div>' : ''
-                   ) +
-                   '<div class="modal-body">' + body + '</div>' +
-                   (footer ?
-                   '<div class="modal-footer">' + footer + '</div>' : ''
-                   ) +
-                 '</div>' +
-               '</div>' +
-             '</div>';
-    };
-
-    var tplButtonInfo = {
-      picture: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'picture-o', {
-          event: 'showImageDialog',
-          title: lang.image.image,
-          hide: true
-        });
-      },
-      link: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'link', {
-          event: 'showLinkDialog',
-          title: lang.link.link,
-          hide: true
-        });
-      },
-      table: function (lang, options) {
-        var dropdown = '<ul class="note-table dropdown-menu">' +
-                         '<div class="note-dimension-picker">' +
-                           '<div class="note-dimension-picker-mousecatcher" data-event="insertTable" data-value="1x1"></div>' +
-                           '<div class="note-dimension-picker-highlighted"></div>' +
-                           '<div class="note-dimension-picker-unhighlighted"></div>' +
-                         '</div>' +
-                         '<div class="note-dimension-display"> 1 x 1 </div>' +
-                       '</ul>';
-        return tplIconButton(options.iconPrefix + 'table', {
-          title: lang.table.table,
-          dropdown: dropdown
-        });
-      },
-      style: function (lang, options) {
-        var items = options.styleTags.reduce(function (memo, v) {
-          var label = lang.style[v === 'p' ? 'normal' : v];
-          return memo + '<li><a data-event="formatBlock" href="#" data-value="' + v + '">' +
-                   (
-                     (v === 'p' || v === 'pre') ? label :
-                     '<' + v + '>' + label + '</' + v + '>'
-                   ) +
-                 '</a></li>';
-        }, '');
-
-        return tplIconButton(options.iconPrefix + 'magic', {
-          title: lang.style.style,
-          dropdown: '<ul class="dropdown-menu">' + items + '</ul>'
-        });
-      },
-      fontname: function (lang, options) {
-        var realFontList = [];
-        var items = options.fontNames.reduce(function (memo, v) {
-          if (!agent.isFontInstalled(v) && options.fontNamesIgnoreCheck.indexOf(v) === -1) {
-            return memo;
-          }
-          realFontList.push(v);
-          return memo + '<li><a data-event="fontName" href="#" data-value="' + v + '" style="font-family:\'' + v + '\'">' +
-                          '<i class="' + options.iconPrefix + 'check"></i> ' + v +
-                        '</a></li>';
-        }, '');
-
-        var hasDefaultFont = agent.isFontInstalled(options.defaultFontName);
-        var defaultFontName = (hasDefaultFont) ? options.defaultFontName : realFontList[0];
-          
-        var label = '<span class="note-current-fontname">' +
-                        defaultFontName +
-                     '</span>';
-        return tplButton(label, {
-          title: lang.font.name,
-          dropdown: '<ul class="dropdown-menu">' + items + '</ul>'
-        });
-      },
-      fontsize: function (lang, options) {
-        var items = options.fontSizes.reduce(function (memo, v) {
-          return memo + '<li><a data-event="fontSize" href="#" data-value="' + v + '">' +
-                          '<i class="fa fa-check"></i> ' + v +
-                        '</a></li>';
-        }, '');
-
-        var label = '<span class="note-current-fontsize">11</span>';
-        return tplButton(label, {
-          title: lang.font.size,
-          dropdown: '<ul class="dropdown-menu">' + items + '</ul>'
-        });
-      },
-      color: function (lang, options) {
-        var colorButtonLabel = '<i class="' + options.iconPrefix + 'font" style="color:black;background-color:yellow;"></i>';
-        var colorButton = tplButton(colorButtonLabel, {
-          className: 'note-recent-color',
-          title: lang.color.recent,
-          event: 'color',
-          value: '{"backColor":"yellow"}'
-        });
-
-        var dropdown = '<ul class="dropdown-menu">' +
-                         '<li>' +
-                           '<div class="btn-group">' +
-                             '<div class="note-palette-title">' + lang.color.background + '</div>' +
-                             '<div class="note-color-reset" data-event="backColor"' +
-                               ' data-value="inherit" title="' + lang.color.transparent + '">' +
-                               lang.color.setTransparent +
-                             '</div>' +
-                             '<div class="note-color-palette" data-target-event="backColor"></div>' +
-                           '</div>' +
-                           '<div class="btn-group">' +
-                             '<div class="note-palette-title">' + lang.color.foreground + '</div>' +
-                             '<div class="note-color-reset" data-event="foreColor" data-value="inherit" title="' + lang.color.reset + '">' +
-                               lang.color.resetToDefault +
-                             '</div>' +
-                             '<div class="note-color-palette" data-target-event="foreColor"></div>' +
-                           '</div>' +
-                         '</li>' +
-                       '</ul>';
-
-        var moreButton = tplButton('', {
-          title: lang.color.more,
-          dropdown: dropdown
-        });
-
-        return colorButton + moreButton;
-      },
-      bold: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'bold', {
-          event: 'bold',
-          title: lang.font.bold
-        });
-      },
-      italic: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'italic', {
-          event: 'italic',
-          title: lang.font.italic
-        });
-      },
-      underline: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'underline', {
-          event: 'underline',
-          title: lang.font.underline
-        });
-      },
-      strikethrough: function (lang) {
-        return tplIconButton('fa fa-strikethrough', {
-          event: 'strikethrough',
-          title: lang.font.strikethrough
-        });
-      },
-      superscript: function (lang) {
-        return tplIconButton('fa fa-superscript', {
-          event: 'superscript',
-          title: lang.font.superscript
-        });
-      },
-      subscript: function (lang) {
-        return tplIconButton('fa fa-subscript', {
-          event: 'subscript',
-          title: lang.font.subscript
-        });
-      },
-      clear: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'eraser', {
-          event: 'removeFormat',
-          title: lang.font.clear
-        });
-      },
-      ul: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'list-ul', {
-          event: 'insertUnorderedList',
-          title: lang.lists.unordered
-        });
-      },
-      ol: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'list-ol', {
-          event: 'insertOrderedList',
-          title: lang.lists.ordered
-        });
-      },
-      paragraph: function (lang, options) {
-        var leftButton = tplIconButton(options.iconPrefix + 'align-left', {
-          title: lang.paragraph.left,
-          event: 'justifyLeft'
-        });
-        var centerButton = tplIconButton(options.iconPrefix + 'align-center', {
-          title: lang.paragraph.center,
-          event: 'justifyCenter'
-        });
-        var rightButton = tplIconButton(options.iconPrefix + 'align-right', {
-          title: lang.paragraph.right,
-          event: 'justifyRight'
-        });
-        var justifyButton = tplIconButton(options.iconPrefix + 'align-justify', {
-          title: lang.paragraph.justify,
-          event: 'justifyFull'
-        });
-
-        var outdentButton = tplIconButton(options.iconPrefix + 'outdent', {
-          title: lang.paragraph.outdent,
-          event: 'outdent'
-        });
-        var indentButton = tplIconButton(options.iconPrefix + 'indent', {
-          title: lang.paragraph.indent,
-          event: 'indent'
-        });
-
-        var dropdown = '<div class="dropdown-menu">' +
-                         '<div class="note-align btn-group">' +
-                           leftButton + centerButton + rightButton + justifyButton +
-                         '</div>' +
-                         '<div class="note-list btn-group">' +
-                           indentButton + outdentButton +
-                         '</div>' +
-                       '</div>';
-
-        return tplIconButton(options.iconPrefix + 'align-left', {
-          title: lang.paragraph.paragraph,
-          dropdown: dropdown
-        });
-      },
-      height: function (lang, options) {
-        var items = options.lineHeights.reduce(function (memo, v) {
-          return memo + '<li><a data-event="lineHeight" href="#" data-value="' + parseFloat(v) + '">' +
-                          '<i class="' + options.iconPrefix + 'check"></i> ' + v +
-                        '</a></li>';
-        }, '');
-
-        return tplIconButton(options.iconPrefix + 'text-height', {
-          title: lang.font.height,
-          dropdown: '<ul class="dropdown-menu">' + items + '</ul>'
-        });
-
-      },
-      help: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'question', {
-          event: 'showHelpDialog',
-          title: lang.options.help,
-          hide: true
-        });
-      },
-      fullscreen: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'arrows-alt', {
-          event: 'fullscreen',
-          title: lang.options.fullscreen
-        });
-      },
-      codeview: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'code', {
-          event: 'codeview',
-          title: lang.options.codeview
-        });
-      },
-      undo: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'undo', {
-          event: 'undo',
-          title: lang.history.undo
-        });
-      },
-      redo: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'repeat', {
-          event: 'redo',
-          title: lang.history.redo
-        });
-      },
-      hr: function (lang, options) {
-        return tplIconButton(options.iconPrefix + 'minus', {
-          event: 'insertHorizontalRule',
-          title: lang.hr.insert
-        });
-      }
-    };
-
-    var tplPopovers = function (lang, options) {
-      var tplLinkPopover = function () {
-        var linkButton = tplIconButton(options.iconPrefix + 'edit', {
-          title: lang.link.edit,
-          event: 'showLinkDialog',
-          hide: true
-        });
-        var unlinkButton = tplIconButton(options.iconPrefix + 'unlink', {
-          title: lang.link.unlink,
-          event: 'unlink'
-        });
-        var content = '<a href="http://www.google.com" target="_blank">www.google.com</a>&nbsp;&nbsp;' +
-                      '<div class="note-insert btn-group">' +
-                        linkButton + unlinkButton +
-                      '</div>';
-        return tplPopover('note-link-popover', content);
-      };
-
-      var tplImagePopover = function () {
-        var fullButton = tplButton('<span class="note-fontsize-10">100%</span>', {
-          title: lang.image.resizeFull,
-          event: 'resize',
-          value: '1'
-        });
-        var halfButton = tplButton('<span class="note-fontsize-10">50%</span>', {
-          title: lang.image.resizeHalf,
-          event: 'resize',
-          value: '0.5'
-        });
-        var quarterButton = tplButton('<span class="note-fontsize-10">25%</span>', {
-          title: lang.image.resizeQuarter,
-          event: 'resize',
-          value: '0.25'
-        });
-
-        var leftButton = tplIconButton(options.iconPrefix + 'align-left', {
-          title: lang.image.floatLeft,
-          event: 'floatMe',
-          value: 'left'
-        });
-        var rightButton = tplIconButton(options.iconPrefix + 'align-right', {
-          title: lang.image.floatRight,
-          event: 'floatMe',
-          value: 'right'
-        });
-        var justifyButton = tplIconButton(options.iconPrefix + 'align-justify', {
-          title: lang.image.floatNone,
-          event: 'floatMe',
-          value: 'none'
-        });
-
-        var roundedButton = tplIconButton(options.iconPrefix + 'square', {
-          title: lang.image.shapeRounded,
-          event: 'imageShape',
-          value: 'img-rounded'
-        });
-        var circleButton = tplIconButton(options.iconPrefix + 'circle-o', {
-          title: lang.image.shapeCircle,
-          event: 'imageShape',
-          value: 'img-circle'
-        });
-        var thumbnailButton = tplIconButton(options.iconPrefix + 'picture-o', {
-          title: lang.image.shapeThumbnail,
-          event: 'imageShape',
-          value: 'img-thumbnail'
-        });
-        var noneButton = tplIconButton(options.iconPrefix + 'times', {
-          title: lang.image.shapeNone,
-          event: 'imageShape',
-          value: ''
-        });
-
-        var removeButton = tplIconButton(options.iconPrefix + 'trash-o', {
-          title: lang.image.remove,
-          event: 'removeMedia',
-          value: 'none'
-        });
-
-        var content = '<div class="btn-group">' + fullButton + halfButton + quarterButton + '</div>' +
-                      '<div class="btn-group">' + leftButton + rightButton + justifyButton + '</div>' +
-                      '<div class="btn-group">' + roundedButton + circleButton + thumbnailButton + noneButton + '</div>' +
-                      '<div class="btn-group">' + removeButton + '</div>';
-        return tplPopover('note-image-popover', content);
-      };
-
-      var tplAirPopover = function () {
-        var $content = $('<div />');
-        for (var idx = 0, len = options.airPopover.length; idx < len; idx ++) {
-          var group = options.airPopover[idx];
-          
-          var $group = $('<div class="note-' + group[0] + ' btn-group">');
-          for (var i = 0, lenGroup = group[1].length; i < lenGroup; i++) {
-            var $button = $(tplButtonInfo[group[1][i]](lang, options));
-
-            $button.attr('data-name', group[1][i]);
-            
-            $group.append($button);
-          }
-          $content.append($group);
-        }
-
-        return tplPopover('note-air-popover', $content.children());
-      };
-
-      var $notePopover = $('<div class="note-popover" />');
-      
-      $notePopover.append(tplLinkPopover());
-      $notePopover.append(tplImagePopover());
-      
-      if (options.airMode) {
-        $notePopover.append(tplAirPopover());
-      }
-      
-      return $notePopover;
-    };
-
-    var tplHandles = function () {
-      return '<div class="note-handle">' +
-               '<div class="note-control-selection">' +
-                 '<div class="note-control-selection-bg"></div>' +
-                 '<div class="note-control-holder note-control-nw"></div>' +
-                 '<div class="note-control-holder note-control-ne"></div>' +
-                 '<div class="note-control-holder note-control-sw"></div>' +
-                 '<div class="note-control-sizing note-control-se"></div>' +
-                 '<div class="note-control-selection-info"></div>' +
-               '</div>' +
-             '</div>';
-    };
-
-    /**
-     * shortcut table template
-     * @param {String} title
-     * @param {String} body
-     */
-    var tplShortcut = function (title, keys) {
-      var keyClass = 'note-shortcut-col col-xs-6 note-shortcut-';
-      var body = [];
-
-      for (var i in keys) {
-        if (keys.hasOwnProperty(i)) {
-          body.push(
-            '<div class="' + keyClass + 'key">' + keys[i].kbd + '</div>' +
-            '<div class="' + keyClass + 'name">' + keys[i].text + '</div>'
-            );
-        }
-      }
-
-      return '<div class="note-shortcut-row row"><div class="' + keyClass + 'title col-xs-offset-6">' + title + '</div></div>' +
-             '<div class="note-shortcut-row row">' + body.join('</div><div class="note-shortcut-row row">') + '</div>';
-    };
-
-    var tplShortcutText = function (lang) {
-      var keys = [
-        { kbd: '‚åò + B', text: lang.font.bold },
-        { kbd: '‚åò + I', text: lang.font.italic },
-        { kbd: '‚åò + U', text: lang.font.underline },
-        { kbd: '‚åò + \\', text: lang.font.clear }
-      ];
-
-      return tplShortcut(lang.shortcut.textFormatting, keys);
-    };
-
-    var tplShortcutAction = function (lang) {
-      var keys = [
-        { kbd: '‚åò + Z', text: lang.history.undo },
-        { kbd: '‚åò + ‚áß + Z', text: lang.history.redo },
-        { kbd: '‚åò + ]', text: lang.paragraph.indent },
-        { kbd: '‚åò + [', text: lang.paragraph.outdent },
-        { kbd: '‚åò + ENTER', text: lang.hr.insert }
-      ];
-
-      return tplShortcut(lang.shortcut.action, keys);
-    };
-
-    var tplShortcutPara = function (lang) {
-      var keys = [
-        { kbd: '‚åò + ‚áß + L', text: lang.paragraph.left },
-        { kbd: '‚åò + ‚áß + E', text: lang.paragraph.center },
-        { kbd: '‚åò + ‚áß + R', text: lang.paragraph.right },
-        { kbd: '‚åò + ‚áß + J', text: lang.paragraph.justify },
-        { kbd: '‚åò + ‚áß + NUM7', text: lang.lists.ordered },
-        { kbd: '‚åò + ‚áß + NUM8', text: lang.lists.unordered }
-      ];
-
-      return tplShortcut(lang.shortcut.paragraphFormatting, keys);
-    };
-
-    var tplShortcutStyle = function (lang) {
-      var keys = [
-        { kbd: '‚åò + NUM0', text: lang.style.normal },
-        { kbd: '‚åò + NUM1', text: lang.style.h1 },
-        { kbd: '‚åò + NUM2', text: lang.style.h2 },
-        { kbd: '‚åò + NUM3', text: lang.style.h3 },
-        { kbd: '‚åò + NUM4', text: lang.style.h4 },
-        { kbd: '‚åò + NUM5', text: lang.style.h5 },
-        { kbd: '‚åò + NUM6', text: lang.style.h6 }
-      ];
-
-      return tplShortcut(lang.shortcut.documentStyle, keys);
-    };
-
-    var tplExtraShortcuts = function (lang, options) {
-      var extraKeys = options.extraKeys;
-      var keys = [];
-
-      for (var key in extraKeys) {
-        if (extraKeys.hasOwnProperty(key)) {
-          keys.push({ kbd: key, text: extraKeys[key] });
-        }
-      }
-
-      return tplShortcut(lang.shortcut.extraKeys, keys);
-    };
-
-    var tplShortcutTable = function (lang, options) {
-      var colClass = 'class="note-shortcut note-shortcut-col col-sm-6 col-xs-12"';
-      var template = [
-        '<div ' + colClass + '>' + tplShortcutAction(lang, options) + '</div>' +
-        '<div ' + colClass + '>' + tplShortcutText(lang, options) + '</div>',
-        '<div ' + colClass + '>' + tplShortcutStyle(lang, options) + '</div>' +
-        '<div ' + colClass + '>' + tplShortcutPara(lang, options) + '</div>'
-      ];
-
-      if (options.extraKeys) {
-        template.push('<div ' + colClass + '>' + tplExtraShortcuts(lang, options) + '</div>');
-      }
-
-      return '<div class="note-shortcut-row row">' +
-               template.join('</div><div class="note-shortcut-row row">') +
-             '</div>';
-    };
-
-    var replaceMacKeys = function (sHtml) {
-      return sHtml.replace(/‚åò/g, 'Ctrl').replace(/‚áß/g, 'Shift');
-    };
-
-    var tplDialogInfo = {
-      image: function (lang, options) {
-        var imageLimitation = '';
-        if (options.maximumImageFileSize) {
-          var unit = Math.floor(Math.log(options.maximumImageFileSize) / Math.log(1024));
-          var readableSize = (options.maximumImageFileSize / Math.pow(1024, unit)).toFixed(2) * 1 +
-                             ' ' + ' KMGTP'[unit] + 'B';
-          imageLimitation = '<small>' + lang.image.maximumFileSize + ' : ' + readableSize + '</small>';
-        }
-
-        var body = '<div class="form-group row-fluid note-group-select-from-files">' +
-                     '<label>' + lang.image.selectFromFiles + '</label>' +
-                     '<input class="note-image-input" type="file" name="files" accept="image/*" multiple="multiple" />' +
-                     imageLimitation +
-                   '</div>' +
-                   '<div class="form-group row-fluid">' +
-                     '<label>' + lang.image.url + '</label>' +
-                     '<input class="note-image-url form-control span12" type="text" />' +
-                   '</div>';
-        var footer = '<button href="#" class="btn btn-primary note-image-btn disabled" disabled>' + lang.image.insert + '</button>';
-        return tplDialog('note-image-dialog', lang.image.insert, body, footer);
-      },
-
-      link: function (lang, options) {
-        var body = '<div class="form-group row-fluid">' +
-                     '<label>' + lang.link.textToDisplay + '</label>' +
-                     '<input class="note-link-text form-control span12" type="text" />' +
-                   '</div>' +
-                   '<div class="form-group row-fluid">' +
-                     '<label>' + lang.link.url + '</label>' +
-                     '<input class="note-link-url form-control span12" type="text" />' +
-                   '</div>' +
-                   (!options.disableLinkTarget ?
-                     '<div class="checkbox">' +
-                       '<label>' + '<input type="checkbox" checked> ' +
-                         lang.link.openInNewWindow +
-                       '</label>' +
-                     '</div>' : ''
-                   );
-        var footer = '<button href="#" class="btn btn-primary note-link-btn disabled" disabled>' + lang.link.insert + '</button>';
-        return tplDialog('note-link-dialog', lang.link.insert, body, footer);
-      },
-
-      help: function (lang, options) {
-        var body = '<a class="modal-close pull-right" aria-hidden="true" tabindex="-1">' + lang.shortcut.close + '</a>' +
-                   '<div class="title">' + lang.shortcut.shortcuts + '</div>' +
-                   (agent.isMac ? tplShortcutTable(lang, options) : replaceMacKeys(tplShortcutTable(lang, options))) +
-                   '<p class="text-center">' +
-                     '<a href="//summernote.org/" target="_blank">Summernote 0.6.6</a> ¬∑ ' +
-                     '<a href="//github.com/summernote/summernote" target="_blank">Project</a> ¬∑ ' +
-                     '<a href="//github.com/summernote/summernote/issues" target="_blank">Issues</a>' +
-                   '</p>';
-        return tplDialog('note-help-dialog', '', body, '');
-      }
-    };
-
-    var tplDialogs = function (lang, options) {
-      var dialogs = '';
-
-      $.each(tplDialogInfo, function (idx, tplDialog) {
-        dialogs += tplDialog(lang, options);
-      });
-
-      return '<div class="note-dialog">' + dialogs + '</div>';
-    };
-
-    var tplStatusbar = function () {
-      return '<div class="note-resizebar">' +
-               '<div class="note-icon-bar"></div>' +
-               '<div class="note-icon-bar"></div>' +
-               '<div class="note-icon-bar"></div>' +
-             '</div>';
-    };
-
-    var representShortcut = function (str) {
-      if (agent.isMac) {
-        str = str.replace('CMD', '‚åò').replace('SHIFT', '‚áß');
-      }
-
-      return str.replace('BACKSLASH', '\\')
-                .replace('SLASH', '/')
-                .replace('LEFTBRACKET', '[')
-                .replace('RIGHTBRACKET', ']');
-    };
-
-    /**
-     * createTooltip
-     *
-     * @param {jQuery} $container
-     * @param {Object} keyMap
-     * @param {String} [sPlacement]
-     */
-    var createTooltip = function ($container, keyMap, sPlacement) {
-      var invertedKeyMap = func.invertObject(keyMap);
-      var $buttons = $container.find('button');
-
-      $buttons.each(function (i, elBtn) {
-        var $btn = $(elBtn);
-        var sShortcut = invertedKeyMap[$btn.data('event')];
-        if (sShortcut) {
-          $btn.attr('title', function (i, v) {
-            return v + ' (' + representShortcut(sShortcut) + ')';
-          });
-        }
-      // bootstrap tooltip on btn-group bug
-      // https://github.com/twbs/bootstrap/issues/5687
-      }).tooltip({
-        container: 'body',
-        trigger: 'hover',
-        placement: sPlacement || 'top'
-      }).on('click', function () {
-        $(this).tooltip('hide');
-      });
-    };
-
-    // createPalette
-    var createPalette = function ($container, options) {
-      var colorInfo = options.colors;
-      $container.find('.note-color-palette').each(function () {
-        var $palette = $(this), eventName = $palette.attr('data-target-event');
-        var paletteContents = [];
-        for (var row = 0, lenRow = colorInfo.length; row < lenRow; row++) {
-          var colors = colorInfo[row];
-          var buttons = [];
-          for (var col = 0, lenCol = colors.length; col < lenCol; col++) {
-            var color = colors[col];
-            buttons.push(['<button type="button" class="note-color-btn" style="background-color:', color,
-                           ';" data-event="', eventName,
-                           '" data-value="', color,
-                           '" title="', color,
-                           '" data-toggle="button" tabindex="-1"></button>'].join(''));
-          }
-          paletteContents.push('<div class="note-color-row">' + buttons.join('') + '</div>');
-        }
-        $palette.html(paletteContents.join(''));
-      });
-    };
-
-    /**
-     * create summernote layout (air mode)
-     *
-     * @param {jQuery} $holder
-     * @param {Object} options
-     */
-    this.createLayoutByAirMode = function ($holder, options) {
-      var langInfo = options.langInfo;
-      var keyMap = options.keyMap[agent.isMac ? 'mac' : 'pc'];
-      var id = func.uniqueId();
-
-      $holder.addClass('note-air-editor note-editable');
-      $holder.attr({
-        'id': 'note-editor-' + id,
-        'contentEditable': true
-      });
-
-      var body = document.body;
-
-      // create Popover
-      var $popover = $(tplPopovers(langInfo, options));
-      $popover.addClass('note-air-layout');
-      $popover.attr('id', 'note-popover-' + id);
-      $popover.appendTo(body);
-      createTooltip($popover, keyMap);
-      createPalette($popover, options);
-
-      // create Handle
-      var $handle = $(tplHandles());
-      $handle.addClass('note-air-layout');
-      $handle.attr('id', 'note-handle-' + id);
-      $handle.appendTo(body);
-
-      // create Dialog
-      var $dialog = $(tplDialogs(langInfo, options));
-      $dialog.addClass('note-air-layout');
-      $dialog.attr('id', 'note-dialog-' + id);
-      $dialog.find('button.close, a.modal-close').click(function () {
-        $(this).closest('.modal').modal('hide');
-      });
-      $dialog.appendTo(body);
-    };
-
-    /**
-     * create summernote layout (normal mode)
-     *
-     * @param {jQuery} $holder
-     * @param {Object} options
-     */
-    this.createLayoutByFrame = function ($holder, options) {
-      var langInfo = options.langInfo;
-
-      //01. create Editor
-      var $editor = $('<div class="note-editor"></div>');
-      if (options.width) {
-        $editor.width(options.width);
-      }
-
-      //02. statusbar (resizebar)
-      if (options.height > 0) {
-        $('<div class="note-statusbar">' + (options.disableResizeEditor ? '' : tplStatusbar()) + '</div>').prependTo($editor);
-      }
-
-      //03. create Editable
-      var isContentEditable = !$holder.is(':disabled');
-      var $editable = $('<div class="note-editable" contentEditable="' + isContentEditable + '"></div>')
-          .prependTo($editor);
-      if (options.height) {
-        $editable.height(options.height);
-      }
-      if (options.direction) {
-        $editable.attr('dir', options.direction);
-      }
-      var placeholder = $holder.attr('placeholder') || options.placeholder;
-      if (placeholder) {
-        $editable.attr('data-placeholder', placeholder);
-      }
-
-      $editable.html(dom.html($holder));
-
-      //031. create codable
-      $('<textarea class="note-codable"></textarea>').prependTo($editor);
-
-      //04. create Toolbar
-      var $toolbar = $('<div class="note-toolbar btn-toolbar" />');
-      for (var idx = 0, len = options.toolbar.length; idx < len; idx ++) {
-        var groupName = options.toolbar[idx][0];
-        var groupButtons = options.toolbar[idx][1];
-
-        var $group = $('<div class="note-' + groupName + ' btn-group" />');
-        for (var i = 0, btnLength = groupButtons.length; i < btnLength; i++) {
-          var buttonInfo = tplButtonInfo[groupButtons[i]];
-          // continue creating toolbar even if a button doesn't exist
-          if (!$.isFunction(buttonInfo)) { continue; }
-
-          var $button = $(buttonInfo(langInfo, options));
-          $button.attr('data-name', groupButtons[i]);  // set button's alias, becuase to get button element from $toolbar
-          $group.append($button);
-        }
-        $toolbar.append($group);
-      }
-      
-      $toolbar.prependTo($editor);
-      var keyMap = options.keyMap[agent.isMac ? 'mac' : 'pc'];
-      createPalette($toolbar, options);
-      createTooltip($toolbar, keyMap, 'bottom');
-
-      //05. create Popover
-      var $popover = $(tplPopovers(langInfo, options)).prependTo($editor);
-      createPalette($popover, options);
-      createTooltip($popover, keyMap);
-
-      //06. handle(control selection, ...)
-      $(tplHandles()).prependTo($editor);
-
-      //07. create Dialog
-      var $dialog = $(tplDialogs(langInfo, options)).prependTo($editor);
-      $dialog.find('button.close, a.modal-close').click(function () {
-        $(this).closest('.modal').modal('hide');
-      });
-
-      //08. create Dropzone
-      $('<div class="note-dropzone"><div class="note-dropzone-message"></div></div>').prependTo($editor);
-
-      //09. Editor/Holder switch
-      $editor.insertAfter($holder);
-      $holder.hide();
-    };
-
-    this.hasNoteEditor = function ($holder) {
-      return this.noteEditorFromHolder($holder).length > 0;
-    };
-
-    this.noteEditorFromHolder = function ($holder) {
-      if ($holder.hasClass('note-air-editor')) {
-        return $holder;
-      } else if ($holder.next().hasClass('note-editor')) {
-        return $holder.next();
-      } else {
-        return $();
-      }
-    };
-
-    /**
-     * create summernote layout
-     *
-     * @param {jQuery} $holder
-     * @param {Object} options
-     */
-    this.createLayout = function ($holder, options) {
-      if (options.airMode) {
-        this.createLayoutByAirMode($holder, options);
-      } else {
-        this.createLayoutByFrame($holder, options);
-      }
-    };
-
-    /**
-     * returns layoutInfo from holder
-     *
-     * @param {jQuery} $holder - placeholder
-     * @return {Object}
-     */
-    this.layoutInfoFromHolder = function ($holder) {
-      var $editor = this.noteEditorFromHolder($holder);
-      if (!$editor.length) {
-        return;
-      }
-
-      // connect $holder to $editor
-      $editor.data('holder', $holder);
-
-      return dom.buildLayoutInfo($editor);
-    };
-
-    /**
-     * removeLayout
-     *
-     * @param {jQuery} $holder - placeholder
-     * @param {Object} layoutInfo
-     * @param {Object} options
-     *
-     */
-    this.removeLayout = function ($holder, layoutInfo, options) {
-      if (options.airMode) {
-        $holder.removeClass('note-air-editor note-editable')
-               .removeAttr('id contentEditable');
-
-        layoutInfo.popover().remove();
-        layoutInfo.handle().remove();
-        layoutInfo.dialog().remove();
-      } else {
-        $holder.html(layoutInfo.editable().html());
-
-        layoutInfo.editor().remove();
-        $holder.show();
-      }
-    };
-
-    /**
-     *
-     * @return {Object}
-     * @return {function(label, options=):string} return.button {@link #tplButton function to make text button}
-     * @return {function(iconClass, options=):string} return.iconButton {@link #tplIconButton function to make icon button}
-     * @return {function(className, title=, body=, footer=):string} return.dialog {@link #tplDialog function to make dialog}
-     */
-    this.getTemplate = function () {
-      return {
-        button: tplButton,
-        iconButton: tplIconButton,
-        dialog: tplDialog
-      };
-    };
-
-    /**
-     * add button information
-     *
-     * @param {String} name button name
-     * @param {Function} buttonInfo function to make button, reference to {@link #tplButton},{@link #tplIconButton}
-     */
-    this.addButtonInfo = function (name, buttonInfo) {
-      tplButtonInfo[name] = buttonInfo;
-    };
-
-    /**
-     *
-     * @param {String} name
-     * @param {Function} dialogInfo function to make dialog, reference to {@link #tplDialog}
-     */
-    this.addDialogInfo = function (name, dialogInfo) {
-      tplDialogInfo[name] = dialogInfo;
-    };
-  };
-
-
-  // jQuery namespace for summernote
-  /**
-   * @class $.summernote 
-   * 
-   * summernote attribute  
-   * 
-   * @mixin defaults
-   * @singleton  
-   * 
-   */
-  $.summernote = $.summernote || {};
-
-  // extends default settings
-  //  - $.summernote.version
-  //  - $.summernote.options
-  //  - $.summernote.lang
-  $.extend($.summernote, defaults);
-
-  var renderer = new Renderer();
-  var eventHandler = new EventHandler();
-
-  $.extend($.summernote, {
-    /** @property {Renderer} */
-    renderer: renderer,
-    /** @property {EventHandler} */
-    eventHandler: eventHandler,
-    /** 
-     * @property {Object} core 
-     * @property {core.agent} core.agent 
-     * @property {core.dom} core.dom
-     * @property {core.range} core.range 
-     */
-    core: {
-      agent: agent,
-      dom: dom,
-      range: range
-    },
-    /** 
-     * @property {Object} 
-     * pluginEvents event list for plugins
-     * event has name and callback function.
-     * 
-     * ``` 
-     * $.summernote.addPlugin({
-     *     events : {
-     *          'hello' : function(layoutInfo, value, $target) {
-     *              console.log('event name is hello, value is ' + value );
-     *          }
-     *     }     
-     * })
-     * ```
-     * 
-     * * event name is data-event property.
-     * * layoutInfo is a summernote layout information.
-     * * value is data-value property.
-     */
-    pluginEvents: {},
-
-    plugins : []
-  });
-
-  /**
-   * @method addPlugin
-   *
-   * add Plugin in Summernote 
-   * 
-   * Summernote can make a own plugin.
-   *
-   * ### Define plugin
-   * ```
-   * // get template function  
-   * var tmpl = $.summernote.renderer.getTemplate();
-   * 
-   * // add a button   
-   * $.summernote.addPlugin({
-   *     buttons : {
-   *        // "hello"  is button's namespace.      
-   *        "hello" : function(lang, options) {
-   *            // make icon button by template function          
-   *            return tmpl.iconButton('fa fa-header', {
-   *                // callback function name when button clicked 
-   *                event : 'hello',
-   *                // set data-value property                 
-   *                value : 'hello',                
-   *                hide : true
-   *            });           
-   *        }
-   *     
-   *     }, 
-   *     
-   *     events : {
-   *        "hello" : function(layoutInfo, value) {
-   *            // here is event code 
-   *        }
-   *     }     
-   * });
-   * ``` 
-   * ### Use a plugin in toolbar
-   * 
-   * ``` 
-   *    $("#editor").summernote({
-   *    ...
-   *    toolbar : [
-   *        // display hello plugin in toolbar     
-   *        ['group', [ 'hello' ]]
-   *    ]
-   *    ...    
-   *    });
-   * ```
-   *  
-   *  
-   * @param {Object} plugin
-   * @param {Object} [plugin.buttons] define plugin button. for detail, see to Renderer.addButtonInfo
-   * @param {Object} [plugin.dialogs] define plugin dialog. for detail, see to Renderer.addDialogInfo
-   * @param {Object} [plugin.events] add event in $.summernote.pluginEvents 
-   * @param {Object} [plugin.langs] update $.summernote.lang
-   * @param {Object} [plugin.options] update $.summernote.options
-   */
-  $.summernote.addPlugin = function (plugin) {
-
-    // save plugin list
-    $.summernote.plugins.push(plugin);
-
-    if (plugin.buttons) {
-      $.each(plugin.buttons, function (name, button) {
-        renderer.addButtonInfo(name, button);
-      });
-    }
-
-    if (plugin.dialogs) {
-      $.each(plugin.dialogs, function (name, dialog) {
-        renderer.addDialogInfo(name, dialog);
-      });
-    }
-
-    if (plugin.events) {
-      $.each(plugin.events, function (name, event) {
-        $.summernote.pluginEvents[name] = event;
-      });
-    }
-
-    if (plugin.langs) {
-      $.each(plugin.langs, function (locale, lang) {
-        if ($.summernote.lang[locale]) {
-          $.extend($.summernote.lang[locale], lang);
-        }
-      });
-    }
-
-    if (plugin.options) {
-      $.extend($.summernote.options, plugin.options);
-    }
-  };
-
-  /*
-   * extend $.fn
-   */
-  $.fn.extend({
-    /**
-     * @method
-     * Initialize summernote
-     *  - create editor layout and attach Mouse and keyboard events.
-     * 
-     * ```
-     * $("#summernote").summernote( { options ..} );
-     * ```
-     *   
-     * @member $.fn
-     * @param {Object|String} options reference to $.summernote.options
-     * @return {this}
-     */
-    summernote: function () {
-      // check first argument's type
-      //  - {String}: External API call {{module}}.{{method}}
-      //  - {Object}: init options
-      var type = $.type(list.head(arguments));
-      var isExternalAPICalled = type === 'string';
-      var isInitOptions = type === 'object';
-
-      // extend default options with custom user options
-      var options = isInitOptions ? list.head(arguments) : {};
-      options = $.extend({}, $.summernote.options, options);
-
-      // Include langInfo in options for later use, e.g. for image drag-n-drop
-      // Setup language info with en-US as default
-      options.langInfo = $.extend(true, {}, $.summernote.lang['en-US'], $.summernote.lang[options.lang]);
-
-      this.each(function (idx, holder) {
-        var $holder = $(holder);
-
-        // if layout isn't created yet, createLayout and attach events
-        if (!renderer.hasNoteEditor($holder)) {
-          renderer.createLayout($holder, options);
-
-          var layoutInfo = renderer.layoutInfoFromHolder($holder);
-
-          eventHandler.attach(layoutInfo, options);
-          eventHandler.attachCustomEvent(layoutInfo, options);
-
-        }
-      });
-
-      // callback on init
-      if (!isExternalAPICalled && this.length && options.oninit) {
-        options.oninit();
-      }
-
-      var $first = this.first();
-      if ($first.length) {
-        var layoutInfo = renderer.layoutInfoFromHolder($first);
-
-        // external API
-        if (isExternalAPICalled) {
-          var moduleAndMethod = list.head(list.from(arguments));
-          var args = list.tail(list.from(arguments));
-
-          // TODO now external API only works for editor
-          var params = [moduleAndMethod, layoutInfo.editable()].concat(args);
-          return eventHandler.invoke.apply(eventHandler, params);
-        } else if (options.focus) {
-          // focus on first editable element for initialize editor
-          layoutInfo.editable().focus();
-        }
-      }
-
-      return this;
-    },
-
-    /**
-     * @method 
-     * 
-     * get the HTML contents of note or set the HTML contents of note.
-     *
-     * * get contents 
-     * ```
-     * var content = $("#summernote").code();
-     * ```
-     * * set contents 
-     *
-     * ```
-     * $("#summernote").code(html);
-     * ```
-     *
-     * @member $.fn 
-     * @param {String} [html] - HTML contents(optional, set)
-     * @return {this|String} - context(set) or HTML contents of note(get).
-     */
-    code: function (html) {
-      // get the HTML contents of note
-      if (html === undefined) {
-        var $holder = this.first();
-        if (!$holder.length) {
-          return;
-        }
-
-        var layoutInfo = renderer.layoutInfoFromHolder($holder);
-        var $editable = layoutInfo && layoutInfo.editable();
-
-        if ($editable && $editable.length) {
-          var isCodeview = eventHandler.invoke('codeview.isActivated', layoutInfo);
-          eventHandler.invoke('codeview.sync', layoutInfo);
-          return isCodeview ? layoutInfo.codable().val() :
-                              layoutInfo.editable().html();
-        }
-        return dom.value($holder);
-      }
-
-      // set the HTML contents of note
-      this.each(function (i, holder) {
-        var layoutInfo = renderer.layoutInfoFromHolder($(holder));
-        var $editable = layoutInfo && layoutInfo.editable();
-        if ($editable) {
-          $editable.html(html);
-        }
-      });
-
-      return this;
-    },
-
-    /**
-     * @method
-     * 
-     * destroy Editor Layout and detach Key and Mouse Event
-     *
-     * @member $.fn
-     * @return {this}
-     */
-    destroy: function () {
-      this.each(function (idx, holder) {
-        var $holder = $(holder);
-
-        if (!renderer.hasNoteEditor($holder)) {
-          return;
-        }
-
-        var info = renderer.layoutInfoFromHolder($holder);
-        var options = info.editor().data('options');
-
-        eventHandler.detach(info, options);
-        renderer.removeLayout($holder, info, options);
-      });
-
-      return this;
-    }
-  });
-}));
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ˇ
+«¶ÛêˇˇÚêˇˇ
+ﬂıWÛêˇˇÚêˇˇ
+·ıWÛêˇˇÚêˇˇ
+ÈıWÛêˇˇÚêˇˇ
+ÒıWÛêˇˇÚêˇˇ
+˘ıWÛêˇˇÚêˇˇˆúˆôˇˇÛêˇˇÚêˇˇ˘ïˆôˇˇÛêˇˇÚêˇˇ
+‹ˆWÛêˇˇÚêˇˇ
+œÀ	ÛêˇˇÚêˇˇ
+ÏˆWÛêˇˇÚêˇˇ
+ÙˆWÛêˇˇÚêˇˇ
+ˆˆWÛêˇˇÚêˇˇ
+¯ˆWÛêˇˇÚêˇˇ÷‘	ˆôˇˇÛêˇˇÚêˇˇ
+Õ˜WÛêˇˇÚêˇˇ
+’˜WÛêˇˇÚêˇˇ
+›˜WÛêˇˇÚêˇˇ
+Â˜WÛêˇˇÚêˇˇ¬Ï÷ôˇˇÛêˇˇÚêˇˇ
+˙˜WÛêˇˇÚêˇˇ
+È£AÛêˇˇÚêˇˇœﬂˆôˇˇÛêˇˇÚêˇˇ
+◊¯WÛêˇˇÚêˇˇ
+Íæ>ÛêˇˇÚêˇˇ
+Á¯WÛêˇˇÚêˇˇ
+È¯WÛêˇˇÚêˇˇÛßˆôˇˇÛêˇˇÚêˇˇ
+¯¯WÛêˇˇÚêˇˇ
+¿˘WÛêˇˇÚêˇˇ
+Ò¶	ÛêˇˇÚêˇˇ
+–˘WÛêˇˇÚêˇˇ
+ÿ˘WÛêˇˇÚêˇˇ
+ÏúÛêˇˇÚêˇˇ
+—‚(ÛêˇˇÚêˇˇ
+˘WÛêˇˇÚêˇˇ
+¯˘WÛêˇˇÚêˇˇ
+¿˙WÛêˇˇÚêˇˇ
+¬˙WÛêˇˇÚêˇˇ
+ ˙WÛêˇˇÚêˇˇ
+“˙WÛêˇˇÚêˇˇ›ˆôˇˇÓ·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇ€üˆôˇˇÛêˇˇÚêˇˇ
+˛˙WÛêˇˇÚêˇˇ
+∆˚WÛêˇˇÚêˇˇƒ£ˆôˇˇÛêˇˇÚêˇˇ
+À˘ÛêˇˇÚêˇˇ
+È˚WÛêˇˇÚêˇˇ
+Ò˚WÛêˇˇÚêˇˇ
+˘˚WÛêˇˇÚêˇˇ
+¡¸WÛêˇˇÚêˇˇ
+…¸WÛêˇˇÚêˇˇ
+—¸WÛêˇˇÚêˇˇ
+”¸WÛêˇˇÚêˇˇ»åˆôˇˇÛêˇˇÚêˇˇ
+‚¸WÛêˇˇÚêˇˇ
+ﬁ¸WÛêˇˇÚêˇˇ
+Ê¸WÛêˇˇÚêˇˇ
+Ó¸WÛêˇˇÚêˇˇ
+ˆ¸WÛêˇˇÚêˇˇ
+˛¸WÛêˇˇÚêˇˇ
+Ù¿UÛêˇˇÚêˇˇ
+Œ˝WÛêˇˇÚêˇˇ
+˘úÛêˇˇÚêˇˇ
+ﬁ˝WÛêˇˇÚêˇˇ
+Ê˝WÛêˇˇÚêˇˇ„’ˆôˇˇÛêˇˇÚêˇˇ
+˚˝WÛêˇˇÚêˇˇ
+√˛WÛêˇˇÚêˇˇ
+ ˜ÛêˇˇÚêˇˇ
+˙ÌBÛêˇˇÚêˇˇÌÔ	ˆôˇˇÓ·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇÊ˜ˆôˇˇÛêˇˇÚêˇˇ
+ˇ˛WÛêˇˇÚêˇˇ
+«ˇWÛêˇˇÚêˇˇ
+œˇWÛêˇˇÚêˇˇ
+◊ˇWÛêˇˇÚêˇˇÀì
+ˆôˇˇÛêˇˇÚêˇˇ
+ÏˇWÛêˇˇÚêˇˇ
+ÙˇWÛêˇˇÚêˇˇ
+ ‹JÛêˇˇÚêˇˇ”ﬁˆôˇˇÓ·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇ‹ˇˆôˇˇÛêˇˇÚêˇˇ
+‚ÄXÛêˇˇÚêˇˇ
+ÍÄXÛêˇˇÚêˇˇ
+ÚÄXÛêˇˇÚêˇˇ
+·ÿÛêˇˇÚêˇˇ
+¬ÅXÛêˇˇÚêˇˇ
+ ÅXÛêˇˇÚêˇˇ
+∆ìÛêˇˇÚêˇˇ
+˚è"ÛêˇˇÚêˇˇ
+‚ÅXÛêˇˇÚêˇˇÈëˆôˇˇÛêˇˇÚêˇˇ
+ÒÅXÛêˇˇÚêˇˇ
+˘ÅXÛêˇˇÚêˇˇ
+‘ÙWÛêˇˇÚêˇˇ
+Ôû
+ÛêˇˇÚêˇˇ
+‰∫TÛêˇˇÚêˇˇ
+ŸÇXÛêˇˇÚêˇˇ
+·ÇXÛêˇˇÚêˇˇ
+Œ∞ÛêˇˇÚêˇˇÃ∆ˆôˇˇÛêˇˇÚêˇˇ˜∆	ˆôˇˇÛêˇˇÚêˇˇ
+ÀÉXÛêˇˇÚêˇˇ
+”ÉXÛêˇˇÚêˇˇ
+€ÉXÛêˇˇÚêˇˇ«ÉˆôˇˇÛêˇˇÚêˇˇ
+ÉXÛêˇˇÚêˇˇ
+¯ÉXÛêˇˇÚêˇˇ€ã	ˆôˇˇÛêˇˇÚêˇˇÒù
+ˆôˇˇÛêˇˇÚêˇˇ
+⁄ÑXÛêˇˇÚêˇˇ’ÃˆôˇˇÛêˇˇÚêˇˇ
+ﬂ‡UÛêˇˇÚêˇˇ
+˜ÑXÛêˇˇÚêˇˇ
+ˇÑXÛêˇˇÚêˇˇ
+Á∏	ÛêˇˇÚêˇˇ
+œÖXÛêˇˇÚêˇˇˆœˆôˇˇÛêˇˇÚêˇˇ
+‚”ÛêˇˇÚêˇˇ
+ÊÖXÛêˇˇÚêˇˇ
+ÓÖXÛêˇˇÚêˇˇ
+ˆå&ÛêˇˇÚêˇˇˆëˆôˇˇÛêˇˇÚêˇˇ
+≈ÜXÛêˇˇÚêˇˇ
+ŸìDÛêˇˇÚêˇˇ
+’ÜXÛêˇˇÚêˇˇ‡ﬁ	ˆôˇˇÛêˇˇÚêˇˇ
+ÍÜXÛêˇˇÚêˇˇÏíˆôˇˇÛêˇˇÚêˇˇ
+ˇÜXÛêˇˇÚêˇˇ
+«áXÛêˇˇÚêˇˇ
+»˛WÛêˇˇÚêˇˇ
+◊áXÛêˇˇÚêˇˇ
+ﬂáXÛêˇˇÚêˇˇ
+ÁáXÛêˇˇÚêˇˇ
+–©ÛêˇˇÚêˇˇ
+˜áXÛêˇˇÚêˇˇ
+ˇáXÛêˇˇÚêˇˇ
+«àXÛêˇˇÚêˇˇ
+ÔÙ	ÛêˇˇÚêˇˇ
+∆òXÛêˇˇÚêˇˇ
+ÂàXÛêˇˇÚêˇˇ–œˆôˇˇÛêˇˇÚêˇˇ
+˙àXÛêˇˇÚêˇˇ
+¬âXÛêˇˇÚêˇˇ
+ âXÛêˇˇÚêˇˇ
+“âXÛêˇˇÚêˇˇ
+⁄âXÛêˇˇÚêˇˇ
+‚âXÛêˇˇÚêˇˇ
+¸ÿUÛêˇˇÚêˇˇ
+ÏâXÛêˇˇÚêˇˇ
+ÙâXÛêˇˇÚêˇˇ
+¸âXÛêˇˇÚêˇˇ
+ƒäXÛêˇˇÚêˇˇÏ≥ˆôˇˇÓ·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇ∆ÑˆôˇˇÛêˇˇÚêˇˇ
+‰äXÛêˇˇÚêˇˇ
+ÏäXÛêˇˇÚêˇˇÂ∏Ó·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇ
+∆ãXÛêˇˇÚêˇˇ
+€ê1ÛêˇˇÚêˇˇ
+÷ãXÛêˇˇÚêˇˇ
+ﬁãXÛêˇˇÚêˇˇ
+ÊÉXÛêˇˇÚêˇˇ¬ÓˆôˇˇÓ·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇÔÂˆôˇˇÛêˇˇÚêˇˇ
+“åXÛêˇˇÚêˇˇœÆˆôˇˇÛêˇˇÚêˇˇ
+€åXÛêˇˇÚêˇˇ
+„åXÛêˇˇÚêˇˇ
+‚ÜXÛêˇˇÚêˇˇ
+ åXÛêˇˇÚêˇˇ
+“åXÛêˇˇÚêˇˇ
+⁄åXÛêˇˇÚêˇˇ
+‹åXÛêˇˇÚêˇˇ
+‰åXÛêˇˇÚêˇˇ
+ÏåXÛêˇˇÚêˇˇ
+ÓåXÛêˇˇÚêˇˇ
+ˆåXÛêˇˇÚêˇˇ
+˛åXÛêˇˇÚêˇˇ
+∆çXÛêˇˇÚêˇˇﬁªÓ·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇ
+‡çXÛêˇˇÚêˇˇƒí	ˆôˇˇÓ·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇ·ËˆôˇˇÛêˇˇÚêˇˇ
+‡ËÛêˇˇÚêˇˇ
+¿ÉÛêˇˇÚêˇˇ
+⁄ÉÛêˇˇÚêˇˇ
+‰éXÛêˇˇÚêˇˇ
+Â‡(ÛêˇˇÚêˇˇ
+ÙéXÛêˇˇÚêˇˇ˜¡ˆôˇˇÛêˇˇÚêˇˇ
+…èXÛêˇˇÚêˇˇÎ§
+ˆôˇˇÛêˇˇÚêˇˇ
+◊ëNÛêˇˇÚêˇˇ
+¸åXÛêˇˇÚêˇˇ
+ÓèXÛêˇˇÚêˇˇ
+ˆèXÛêˇˇÚêˇˇ
+‹Ã1ÛêˇˇÚêˇˇ
+÷ÓKÛêˇˇÚêˇˇ
+ŒêXÛêˇˇÚêˇˇ
+÷êXÛêˇˇÚêˇˇ
+ﬁêXÛêˇˇÚêˇˇ
+ÊêXÛêˇˇÚêˇˇ
+ÓêXÛêˇˇÚêˇˇÃ™Ó·˚ˇÛêˇˇﬂ·˚ˇÚêˇˇ
+˝€FÛêˇˇÚêˇˇ
+ ëXÛêˇˇÚêˇˇ
+“ëXÛêˇˇÚêˇˇ
+⁄ëXÛêˇˇÚêˇˇ
+‚ëXÛêˇˇÚêˇˇ
+€ø	ÛêˇˇÚêˇˇ…Ù≈˚ˇˇ©÷ôˇˇ”é÷ôˇˇÃéX÷ôˇˇ—≠	÷ôˇˇÚãX÷ôˇˇ«±ˆôˇˇÛÅˆôˇˇ›◊ˆôˇˇÈ ˆôˇˇÊàˆôˇˇˆˆôˇˇÙÒˆôˇˇ¿Àˆôˇˇ“ıˆôˇˇ„ùˆôˇˇÃìˆôˇˇƒﬁˆôˇˇ‡œˆôˇˇ÷‚ˆôˇˇ‚ªˆôˇˇ˛ÛˆôˇˇÚÛˆôˇˇ„Æ	ˆôˇˇÿäˆôˇˇÏô	ˆôˇˇ¬ÛˆôˇˇÏäˆôˇˇˇÚˆôˇˇÓƒ	ˆôˇˇÙÇˆôˇˇÚˆôˇˇÂÒˆôˇˇÕÕˆôˇˇ¸‘	ˆôˇˇÙËˆôˇˇ⁄ëˆôˇˇ˜Ôˆôˇˇ›‡ˆôˇˇ≈Ìˆôˇˇ‚∞ˆôˇˇÙÕˆôˇˇ˛˜ˆôˇˇÿÓˆôˇˇ·∞ˆôˇˇ¸∞ˆôˇˇ‘Òˆôˇˇ€óˆôˇˇ»”ˆôˇˇ÷Ù	ˆôˇˇ÷€ˆôˇˇÀôˆôˇˇ≈£	ˆôˇˇÓ¨
+ˆôˇˇÕÑˆôˇˇÍùˆôˇˇ›ﬁˆôˇˇƒˇˆôˇˇ‹Ì	ˆôˇˇ˘‘ˆôˇˇÿŒˆôˇˇÒÏˆôˇˇÍàˆôˇˇÌÔˆôˇˇ¯ŒˆôˇˇÌçˆôˇˇ◊∑ˆôˇˇ‹—ˆôˇˇÛöˆôˇˇ“‰ˆôˇˇÁËˆôˇˇÎÁˆôˇˇ˙˚ˆôˇˇÃÙˆôˇˇ…®ˆôˇˇ¬»ˆôˇˇÊˆôˇˇÙ∫ˆôˇˇÿÊˆôˇˇßˆôˇˇˆµ	ˆôˇˇœ¯ˆôˇˇÀãˆôˇˇÿÓˆôˇˇ…œˆôˇˇÚÔ	ˆôˇˇ—ÜˆôˇˇˇﬂˆôˇˇÛ“ˆôˇˇ˙„ˆôˇˇÓ„ˆôˇˇ“îˆôˇˇ⁄Ûˆôˇˇ≈∫ˆôˇˇÕ™	ˆôˇˇ¸ÛˆôˇˇË‘ˆôˇˇÓ·ˆôˇˇ…»ˆôˇˇ·µˆôˇˇÈÄˆôˇˇÔ¸ˆôˇˇÌÈˆôˇˇ ”ˆôˇˇ˝ﬂˆôˇˇ√§ˆôˇˇ˛¸ˆôˇˇÒ’ˆôˇˇ‰Ωˆôˇˇ–˙ˆôˇˇÎπˆôˇˇ¬◊ˆôˇˇ”Úˆôˇˇ„éˆôˇˇÃﬂˆôˇˇ¿ﬂˆôˇˇ¬Éˆôˇˇ‹èˆôˇˇﬂ≈ˆôˇˇÎÌˆôˇˇ„£ˆôˇˇ⁄∫ˆôˇˇ◊›ˆôˇˇ·ßˆôˇˇ∆≠ˆôˇˇŒªˆôˇˇ“¬ˆôˇˇ◊∑ˆôˇˇÒ›ˆôˇˇÈ€ˆôˇˇƒ–ˆôˇˇıŸˆôˇˇ«±ˆôˇˇÂ¸ˆôˇˇ‰¬ˆôˇˇ¯‹ˆôˇˇ˘¯ˆôˇˇÌ˜ˆôˇˇÏõˆôˇˇÔŸˆôˇˇ√Ãˆôˇˇ˙˜ˆôˇˇÃÿˆôˇˇ…ÓˆôˇˇÏ◊ˆôˇˇÈßˆôˇˇÒˇˆôˇˇ˘˘ˆôˇˇ⁄Ôˆôˇˇ–”ˆôˇˇŸ˙ˆôˇˇÒ…ˆôˇˇﬁΩˆôˇˇ‘ªˆôˇˇˇÅˆôˇˇÚ÷ˆôˇˇ—÷ˆôˇˇ¡¨ˆôˇˇÓ®ˆôˇˇ–˚ˆôˇˇÏ˘ˆôˇˇŒÜˆôˇˇƒ™
+ˆôˇˇ¬Êˆôˇˇ∆µˆôˇˇÛ˙ˆôˇˇ€÷	ˆôˇˇ‰‚ˆôˇˇÌ≥ˆôˇˇ¸˝ˆôˇˇ’ÓˆôˇˇÌ”ˆôˇˇ·”ˆôˇˇƒÇˆôˇˇˆ«ˆôˇˇŒâˆôˇˇˆ«ˆôˇˇÁ‡ˆôˇˇ¸Ïˆôˇˇ◊ä
+ˆôˇˇ¸€ˆôˇˇ‡„ˆôˇˇˇˆôˇˇ¿¸ˆôˇˇ€•ˆôˇˇﬂˇˆôˇˇ›¸ˆôˇˇ€ˆôˇˇ¿ÅˆôˇˇÚãˆôˇˇ‹ú
+ˆôˇˇ—∂ˆôˇˇ—¶ˆôˇˇ –ˆôˇˇ∆£ˆôˇˇ»œˆôˇˇÌ¿	ˆôˇˇˆÕˆôˇˇ“êˆôˇˇÂÊˆôˇˇ‹˙ˆôˇˇ—˝ˆôˇˇ¿£ˆôˇˇŸ∂ˆôˇˇ¯Àˆôˇˇ€ÖˆôˇˇŒ‚ˆôˇˇÚÈˆôˇˇ’Ûˆôˇˇ“ıˆôˇˇ˝ ˆôˇˇ‚Ç
+ˆôˇˇ‡ƒˆôˇˇ¬ÍˆôˇˇÙœˆôˇˇ˛≈ˆôˇˇı˛ˆôˇˇ⁄áˆôˇˇ÷ôˆôˇˇ’éˆôˇˇ˜◊ˆôˇˇ—˜ˆôˇˇ«˙ˆôˇˇÒ»ˆôˇˇÍÃ	ˆôˇˇ–…
+ˆôˇˇÿÓˆôˇˇ«›ˆôˇˇ∆ƒˆôˇˇÂ∞ˆôˇˇ‰Ÿˆôˇˇ»¯ˆôˇˇ˚Íˆôˇˇ€ÊˆôˇˇÏÎˆôˇˇÙêˆôˇˇ˙Ëˆôˇˇ·ªˆôˇˇﬁâˆôˇˇ√í
+ˆôˇˇ¡ÓˆôˇˇƒÓˆôˇˇ≈ˇˆôˇˇÍÏˆôˇˇˆÅˆôˇˇˆºˆôˇˇ·’ˆôˇˇ⁄Ôˆôˇˇ›Éˆôˇˇ“èˆôˇˇˆßˆôˇˇÈ·	ˆôˇˇ’æˆôˇˇˇÚˆôˇˇ˝–ˆôˇˇ˛´ˆôˇˇÂëˆôˇˇ‚öˆôˇˇÃ°ˆôˇˇˇÌˆôˇˇÚŸˆôˇˇ¸üˆôˇˇ…çˆôˇˇÕµ
+ˆôˇˇŒˆôˇˇ◊»ˆôˇˇ‰ôˆôˇˇÕÀˆôˇˇ€ºˆôˇˇƒæˆôˇˇŒ∫ˆôˇˇ√Úˆôˇˇ√…	ˆôˇˇ¯ëˆôˇˇﬁºˆôˇˇÃãˆôˇˇ€Åˆôˇˇ¯¡ˆôˇˇﬂÓˆôˇˇ¿Åˆôˇˇ◊‘ˆôˇˇ¡˝	ˆôˇˇÕªˆôˇˇ›∫ˆôˇˇ˘·	ˆôˇˇ˝êˆôˇˇ ñˆôˇˇ¸ÌˆôˇˇÊÊˆôˇˇ˛¡ˆôˇˇ«‚ˆôˇˇ“ßˆôˇˇÀ»ˆôˇˇŒµˆôˇˇ¯Öˆôˇˇ˜˘ˆôˇˇƒ™ˆôˇˇˆÃ	ˆôˇˇÀÚˆôˇˇ›∆ˆôˇˇˇ˘ˆôˇˇ«ÕˆôˇˇÈÜˆôˇˇ¯≥ˆôˇˇ‰˘ˆôˇˇ‡≥ˆôˇˇÈ÷ˆôˇˇˆ›ˆôˇˇÎˆôˇˇ∆˜ˆôˇˇÓªˆôˇˇÃ±ˆôˇˇ≠ˆôˇˇ‚ïˆôˇˇ€ÑˆôˇˇÒ∞ˆôˇˇÚùˆôˇˇ÷∏ˆôˇˇÏ≈ˆôˇˇ¡∞ˆôˇˇ‡ØˆôˇˇœÔˆôˇˇ–Òˆôˇˇ¸‚ˆôˇˇÓ ˆôˇˇƒ∏ˆôˇˇ‡Æˆôˇˇ‘Æˆôˇˇ‘¯ˆôˇˇˆûˆôˇˇƒ‹ˆôˇˇ‘˜ˆôˇˇÌ´ˆôˇˇˆôˇˇıÆˆôˇˇ˘Õˆôˇˇ“ãˆôˇˇËëˆôˇˇ–¶ˆôˇˇ˙ùˆôˇˇ…ˆôˇˇ«·ˆôˇˇÎçˆôˇˇ«©ˆôˇˇÓØˆôˇˇÿ˘ˆôˇˇÛ∂ˆôˇˇÁ¥ˆôˇˇ–åˆôˇˇ√±
+ˆôˇˇﬁßˆôˇˇ·˙ˆôˇˇ‰óˆôˇˇ·≈ˆôˇˇˆ¶ˆôˇˇÏåˆôˇˇÁÉˆôˇˇÙÖˆôˇˇ—¥ˆôˇˇÙ⁄ˆôˇˇÒâˆôˇˇƒñˆôˇˇŒôˆôˇˇıàˆôˇˇÕ™ˆôˇˇ‚∞ˆôˇˇﬂçˆôˇˇŒñˆôˇˇˆÉˆôˇˇ„Ø
+ˆôˇˇÚ˝ˆôˇˇÀóˆôˇˇ÷‹ˆôˇˇÌ°ˆôˇˇÎµÓ·˚ˇÊµÓ·˚ˇƒàÓ·˚ˇÒ¸Ó·˚ˇ”µÓ·˚ˇˇÿÓ·˚ˇ◊¥Ó·˚ˇ⁄¥Ó·˚ˇ’¥Ó·˚ˇ≥Ó·˚ˇ„≥Ó·˚ˇﬁ≥Ó·˚ˇÈ≤Ó·˚ˇÔüÓ·˚ˇ˝±Ó·˚ˇˆÀÓ·˚ˇ·±Ó·˚ˇ‹±Ó·˚ˇˇ∞Ó·˚ˇØÓ·˚ˇÎØÓ·˚ˇﬁØÓ·˚ˇ≈Ó·˚ˇ‚÷Ó·˚ˇÎÆÓ·˚ˇ–⁄Ó·˚ˇÔÆÓ·˚ˇ⁄ÆÓ·˚ˇ≈≠Ó·˚ˇ€óÓ·˚ˇÔ¨Ó·˚ˇ⁄¨Ó·˚ˇ‰…Ó·˚ˇ˛´Ó·˚ˇ¡¨Ó·˚ˇ¸´Ó·˚ˇÁ´Ó·˚ˇÍ´Ó·˚ˇ»†Ó·˚ˇ˛™Ó·˚ˇ¡´Ó·˚ˇÌ“Ó·˚ˇÂ™Ó·˚ˇÏ‰Ó·˚ˇ…™Ó·˚ˇƒ©Ó·˚ˇ◊®Ó·˚ˇ”°Ó·˚ˇÈßÓ·˚ˇ‰ßÓ·˚ˇÁßÓ·˚ˇ“ßÓ·˚ˇ≈˝Ó·˚ˇ¿„Ó·˚ˇ˜¶Ó·˚ˇ˙¶Ó·˚ˇÂ¶Ó·˚ˇ˙ΩÓ·˚ˇ›üÓ·˚ˇËûÓ·˚ˇ≈ÎÓ·˚ˇÃ‡Ó·˚ˇÕ˚Ó·˚ˇ˚°Ó·˚ˇ‰ÈÓ·˚ˇ»ûÓ·˚ˇ˚ùÓ·˚ˇ˛ùÓ·˚ˇ’ÍÓ·˚ˇ“ùÓ·˚ˇÕùÓ·˚ˇËúÓ·˚ˇ—úÓ·˚ˇ‘úÓ·˚ˇˇöÓ·˚ˇ˙öÓ·˚ˇÂöÓ·˚ˇ¯ôÓ·˚ˇ˜æÓ·˚ˇÈ§Ó·˚ˇ“ÄYÛêˇˇÙ˚XÛêˇˇ·˚XÛêˇˇıˆXÛêˇˇÈıXÛêˇˇﬂÌXÛêˇˇ“ÌXÛêˇˇ…‘ﬂ·˚ˇ¸≠ﬂ·˚ˇﬂìﬂ·˚ˇÚ…ﬂ·˚ˇ¡≠ﬂ·˚ˇÚ¨ﬂ·˚ˇÈ…ﬂ·˚ˇ‚©ﬂ·˚ˇ„©ﬂ·˚ˇ√§
+ˆôˇˇﬂ·˚ˇÓ·˚ˇ¯ 
+÷ôˇˇˆôˇˇﬂ·˚ˇÓ·˚ˇÛÎ÷ôˇˇˆôˇˇﬂ·˚ˇÓ·˚ˇ„ÂÚêˇˇÛêˇˇﬂ·˚ˇÓ·˚ˇ‘˙ÚêˇˇÛêˇˇﬂ·˚ˇÓ·˚ˇ›ÆÚêˇˇÛêˇˇˆôˇˇÓ·˚ˇ÷ôˇˇﬂ·˚ˇŸ√ÚêˇˇÛêˇˇﬂ·˚ˇÓ·˚ˇƒ®
+ÚêˇˇÛêˇˇﬂ·˚ˇÓ·˚ˇ
+Òëﬂ·˚ˇÚêˇˇÀüÚêˇˇÛêˇˇˆôˇˇﬂ·˚ˇÓ·˚ˇ‘ÁÚêˇˇÛêˇˇﬂ·˚ˇÓ·˚ˇ‹≠ﬂ·˚ˇœÀﬂ·˚ˇ‹´ﬂ·˚ˇÈF∆ß                                                                                                                                                                                                                                                                                                                                                                                                                     >Support 'as' keyword in import statements.</li> 
+ <li>Implemented Refactoring: Pull Members Up/Push Members Down</li> 
+ <li>Support extern interfaces. (Issue #202)</li> 
+ <li>Fix visibility determination for methods. (Better completions)</li> 
+ <li>Check for duplicate imports when copy/pasting.</li> 
+ <li> Fix resolving classes that appear inside of an import file with a different name than the class itself. Fixes goto declaration as well. </li> 
+ <li>Fix colorizing identifiers (variable names) in code.</li> 
+ <li>Fix Issue 162: &quot;call(new x(), new x());&quot; parse failure.</li> 
+ <li>(Re)Allow &quot;new&quot; for extern and prototype function declarations.</li> 
+ <li>Fixed IDEA freeze when XML is edited</li> 
+ <li>Implemented Refactoring: Extract Superclass</li> 
+ <li>Implemented Refactoring: Extract Interface</li> 
+ <li>Implemented Refactoring: Push Members Down</li> 
+ <li>Fixed OutOfBoundsException when resolving names.</li> 
+ <li>Fix most unit tests.</li> 
+</ul> 
+<p>0.9.2: (community release, IDEA 14 only)</p> 
+<ul> 
+ <li>Fixed: HaxeReferenceCopyPasteProcessor issue preventing from using copy paste clipboard functionality</li> 
+</ul> 
+<p>0.9: (community release)</p> 
+<ul> 
+ <li>Release ID change only</li> 
+</ul> 
+<p>0.8.1.1.TiVo.4: (community version, TiVo Release 4)</p> 
+<ul> 
+ <li>Class Hierarchy view panels implemented. (Menu-&gt;Navigate-&gt;Type Hierarchy, et al)</li> 
+ <li>Better handling of import files.</li> 
+ <li>Better handling of Haxe language parsing, including many Haxe 3 features.</li> 
+ <li>Automatic detection and use of installed haxe libraries (using the 'haxelib' command).</li> 
+ <li>Better completion (Ctrl-space) using the Haxe compiler -- OpenFL projects only.</li> 
+ <li>Refactorings: 
+  <ul> 
+   <li>Pull up members from class to super-class</li> 
+   <li>Pull up members from class to interface</li> 
+   <li>Split into declaration and assignment</li> 
+   <li>Optimize imports</li> 
+  </ul> </li> 
+ <p> The following sub-releases are included:</p> 
+ <ul> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.16: (community version, TiVo RC5)</p> 
+   <ul> 
+    <li>Refactoring: Pull up members from class to super-class</li> 
+    <li>Refactoring: Pull up members from class to interface</li> 
+    <li>Launch Haxe/Neko tests (Patch #131)</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.15: (community version, TiVo RC4)</p> 
+   <ul> 
+    <li>Fixed issue 37 (Parser doesn't recover after new A)</li> 
+    <li>Fixed issue 95 (Local and class variable names resolving to similar package names)</li> 
+    <li>Fixed issue 132 (incorrect processing of duplicate imports)</li> 
+    <li>Fixed issue 134 (incorrect reformat of object and array children)</li> 
+    <li>Fixed reference resolution for expressions in parenthesis - otherwise, code assist does not work for those.</li> 
+    <li>Fixed: launching test with neko, overriding haxe build parameters for test run configuration, filtering test result output, compilation path of non test build, line number for ErrorFilter; and removed hard-coded path for ErrorFilter</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.14: (community version, TiVo RC3)</p> 
+   <ul> 
+    <li>Fixed NPE causing the structure view to not populate, resulting from an errant merge.</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.13: (community version, TiVo RC2)</p> 
+   <ul> 
+    <li>Resolve 'convenience' imports that do not export a class named similarly to the file. (TiVo Issue #55)</li> 
+    <li>Update unbalanced preprocessor token highlighting and detection.</li> 
+    <li>Improve indentation of comments and preprocessor macros.</li> 
+    <li>Update for Grammar-Kit 1.2.0.1 </li> 
+    <li>Fixed syntax rules (BNF) for constructors and external functions.</li> 
+    <li>Fixed syntax rules (BNF) for code blocks; removed them from being valid syntax everywhere an expression can appear.</li> 
+    <li>Fixed syntax rules (BNF) to allow meta tags on typedefs.</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.12: (community version, TiVo RC1+Fixes)</p> 
+   <ul> 
+    <li>Auto-indent when adding curly brackets now works correctly. Fixes github tivo/intellij-haxe Issue #119. (Thanks, J&eacute;r&eacute;my!)</li> 
+    <li>Fix IDE hang on completion for Haxe compiler completions.</li> 
+    <li>Fix auto-adding new import statements above package declaration and/or comments.</li> 
+    <li>Fix NPE when manually adding new import statements.</li> 
+    <li>Put debugging dialogs on the UI thread.</li> 
+    <li>Fix ArrayOutOfBounds exception when initializing haxelib cache.</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.11: (community version, TiVo RC1)</p> 
+   <ul> 
+    <li>Fix NPE when colorizing.</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.10: (community version, TiVo WIP)</p> 
+   <ul> 
+    <li> Added timeout to long-running call hierarchy searches. </li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.9: (community version, TiVo WIP)</p> 
+   <ul> 
+    <li> Fixed Haxe command-line debugger integration for OpenFL projects that are targetting C++ native runtime environments. </li> 
+    <li> Fixed method hierarchy runtime exceptions, and auto-scrolling to source. </li> 
+    <li> Fixed type hierarchy auto-scrolling to source. </li> 
+    <li> Enhanced run &amp; debug output to be color-coded for improved readability. </li> 
+    <li> Fixed find-usages regression. </li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.8: (community version, TiVo WIP)</p> 
+   <ul> 
+    <li> More load-time optimizations using new 'haxelib list-path' command. </li> 
+    <li> Add package and file names to Type hierarchy window. (File names only display if the file name differs from the type name.) </li> 
+    <li> Fixed supertypes list in the combo view of the Type hierarchy window. </li> 
+    <li> Allow block statements everywhere. </li> 
+    <li> Allow array literals to have additional comma [1,] </li> 
+    <li> Moving a file from one package to another no longer displays &quot;Unimplemented&quot; and now moves the file, however references are not yet updated. Issue #88 -- still unresolved. </li> 
+    <li> Updated unit tests. Issues: #71, #68.</li> 
+    <li> Fix formatting for &quot;&gt;=&quot;, which is used be to reformatted to &quot;&gt; =&quot;. Issue </li> 
+    <li> Fix logic for HaxeIfSurrounder.java /testIf test case/ </li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.7: (community version, TiVo WIP)</p> 
+   <ul> 
+    <li>Repaired resolving references to classes and variables.</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.6: (community version, TiVo WIP)</p> 
+   <ul> 
+    <li>Further optimized load time for large projects.</li> 
+    <li>Run haxelib-&gt;Project/SDK/Module library dependency synchronization in the background. </li> 
+    <li>HXML completion: add parameters for compiler argument to presentable text of completion item </li> 
+    <li>Completion from Haxe compiler: parse function parameters and return type to generate completion item with parameters and return type </li> 
+    <li>Completion from Haxe compiler: format data from compiler replace &quot;&lt;&quot; to &quot;&lt;&quot; and &quot;&gt;&quot; to &quot;&gt;&quot; </li> 
+    <li>HaxeReferenceImpl.java getVariants(completion): Handle case when &quot;var d:Array = []; d.|&quot; when d is not resolved </li> 
+    <li>Add description to completion recived from Haxe compiler: HaxeMetaTagsCompletionContributor.java HXMLDefineCompletionContributor.java HXMLCompilerArgumentsCompletionContributor.java </li> 
+    <li>Preliminary Haxe compiler completion support (OpenFL only)</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.5: (community version, TiVo WIP)</p> 
+   <ul> 
+    <li>Decreased time to load large projects considerably. Note that project loading is still on the UI thread, so it may appear to lock up for a short period of time. For very large projects, 90 seconds is not out of the ordinary. </li> 
+    <li>HXML completion: Provide available libraries list</li> 
+    <li>HXML completion: show installed haxelibs(also installed libs removed from available haxelibs list)</li> 
+    <li>Fix meta tag parsing issues</li> 
+    <li>HaxeMetaTagsCompletionContributor provides completion for meta tags</li> 
+    <li>Project Xml(NME, OpenFL project project) completion: show available and installed haxelibs</li> 
+    <li>SplitIntoDeclarationAndAssignment intention action</li> 
+   </ul> </li> 
+  <li> <p>0.8.1.1.TiVo.ClassHierarchy.4: (community version, TiVo WIP)</p> 
+   <ul> 
+    <li>Merged with version 0.8.1.1.TiVo.2 from the TiVo/master branch.</li> 
+    <li>Class Hierarchy partial implementation.</li> 
+    <li>SuperTypes work. Sub-types work within the same module.</li> 
+    <li>All recent changes from github.com/Jetbrains/intellij-haxe/master</li> 
+    <li>Support typedef optional parameters</li> 
+    <li>Support optional function types</li> 
+    <li>Eat compile-time conditional statements only (prevent eating conditional body as it was before)</li> 
+    <li>Fix multiple metas issue on class</li> 
+    <li>Highlight compile-time conditional statements if they don't have matching closing statements</li> 
+    <li>Remove &quot;from&quot; and &quot;to&quot; from keywords, instead highlight them only if they used in abstract declaration</li> 
+    <li>Prevent suggesting imports for using statements</li> 
+    <li>Resolve references that have full path to type/field</li> 
+    <li>Support function types, anonymous types as abstract type</li> 
+    <li>Automatically add and remove dependencies when project gets opened</li> 
+    <li>Remove &quot;&gt;=&quot; and &quot;&gt;&gt;=&quot; tokens from lexer, instead parse ('&gt;' '=') to avoid issues(https://github.com/TiVo/intellij-haxe/issues/42)</li> 
+    <li>Support &quot;inline&quot; declaration attribute on local functions</li> 
+    <li>Suggest to import class on code paste</li> 
+    <li>Support macro expressions(including ECheckType)</li> 
+    <li>Lots more... TODO: Get a complete list of updates.</li> 
+   </ul> </li> 
+ </ul> 
+</ul> 
+<p>0.8.1.1.TiVo.2: (TiVo version)</p> 
+<ul> 
+ <li>openFL path can now be retrieved from an .iml file</li> 
+</ul> 
+<p>0.8.1.1: (community version)</p> 
+<ul> 
+ <li>&quot;Find usages in project&quot; fixed.</li> 
+ <li>Allowed @:final on methods and fields.</li> 
+ <li>Re-implemented hxcpp debugger support to work with Haxe v3 built-in debugger</li> 
+</ul> 
+<p>0.8.1: (community version)</p> 
+<ul> 
+ <li>Remove com.intellij.modules.java from dependencies list to make plugin work in PHPStorm(and other IntelliJ IDEA platform-based IDEs)</li> 
+</ul> 
+<p>0.8: (community version)</p> 
+<ul> 
+ <li>Migration to new IntelliJ IDEA 13.1 API</li> 
+ <li>HXML syntax highlighting</li> 
+ <li>HXML completion</li> 
+ <li>Parser support for different types of imports</li> 
+ <li>Parser support for @:jsRequire and more parser fixes</li> 
+</ul> 
+<p>0.7.2: (community version)</p> 
+<ul> 
+ <li>New version number</li> 
+ <li>basic hxml support</li> 
+ <li>@:jsRequire meta support</li> 
+ <li>Haxe grammar: @:jsRequire and macro support</li> 
+ <li>templates naming fix (&quot;create new class/enum/interface&quot; issue)</li> 
+ <li>new/get/set/never keywords, get/set identifiers are valid, jar build</li> 
+</ul> 
+<p>0.7.1:</p> 
+<ul> 
+ <li>Bug fixes for 13.1.1</li> 
+</ul> 
+<p>0.7:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.6.9:</p> 
+<ul> 
+ <li>Neko target for OpenFL</li> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.6.5:</p> 
+<ul> 
+ <li>OpenFL support</li> 
+</ul> 
+<p>0.6.4:</p> 
+<ul> 
+ <li>Optimize imports</li> 
+</ul> 
+<p>0.6.3:</p> 
+<ul> 
+ <li>Parser improvements</li> 
+</ul> 
+<p>0.6.2:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.6.1:</p> 
+<ul> 
+ <li>Haxe 3 support</li> 
+</ul> 
+<p>0.6:</p> 
+<ul> 
+ <li>Folding</li> 
+</ul> 
+<p>0.5.8:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.5.6:</p> 
+<ul> 
+ <li>NME support improvements</li> 
+ <li>HXCPP debugger improvements</li> 
+</ul> 
+<p>0.5.5:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.5.4:</p> 
+<ul> 
+ <li>New Compiler Mode</li> 
+</ul> 
+<p>0.5.2:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.5.1:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.5:</p> 
+<ul> 
+ <li>HXCPP Debugging</li> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.4.7:</p> 
+<ul> 
+ <li>Introduce Variable Refactoring</li> 
+ <li>Using Completion</li> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.4.6:</p> 
+<ul> 
+ <li>Conditional Compilation Support</li> 
+ <li>Bug fixes</li> 
+</ul> 
+<p>0.4.5:</p> 
+<ul> 
+ <li>Live Templates</li> 
+ <li>Surround With Action</li> 
+ <li>Smart completion</li> 
+ <li>Goto Test Action</li> 
+</ul> 
+<p>0.4.4:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+ <li>EReg support</li> 
+</ul> 
+<p>0.4.3:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+ <li>Structure view</li> 
+</ul> 
+<p>0.4.1:</p> 
+<ul> 
+ <li>Bug fixes</li> 
+ <li>Unresolved type inspection</li> 
+</ul> 
+<p>0.4:</p> 
+<ul> 
+ <li>NME Support</li> 
+ <li>Override/Implement method action</li> 
+ <li>Generate getter/setter action</li> 
+ <li>Parameter info action</li> 
+</ul> 
+<p>0.3:</p> 
+<ul> 
+ <li>Type resolving improvements</li> 
+ <li>Goto Implementation(s) action</li> 
+ <li>Goto Super Method action</li> 
+ <li>Move refactoring</li> 
+</ul> 
+<p>0.2.3:</p> 
+<ul> 
+ <li>Completion fixes</li> 
+</ul> 
+<p>0.2.2:</p> 
+<ul> 
+ <li>Type resolving improvements</li> 
+ <li>Rename refactoring</li> 
+ <li>NMML scheme</li> 
+ <li>HXML support</li> 
+</ul> 
+<p>0.2.1:</p> 
+<ul> 
+ <li>Type resolving improvements</li> 
+ <li>Documentation support</li> 
+ <li>New color settings</li> 
+</ul> 
+<p>0.2:</p> 
+<ul> 
+ <li>Jump to declaration of local, std symbol or class</li> 
+ <li>Reference completion</li> 
+ <li>Class completion</li> 
+ <li>Color settings</li> 
+ <li>Code formatter</li> 
+ <li>Go to Class</li> 
+ <li>Icons for Haxe files</li> 
+ <li>Search for usages</li> 
+ <li>Highlight symbol occurencies</li> 
+ <li>Debugger for Flash target (&quot;Flash/Flex Support&quot; plugin required)</li> 
+</ul> 
+<p>0.1:</p> 
+<ul> 
+ <li>Haxe module and SDK</li> 
+ <li>Parsing Haxe files</li> 
+ <li>Keyword completion</li> 
+ <li>Compile Haxe files and run in Neko VM</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>4.3</rating></idea-plugin><idea-plugin downloads='220272' size='273655' date='1415897970000' url='https://github.com/dmarcotte/idea-handlebars'><name>Handlebars/Mustache</name><id>com.dmarcotte.handlebars</id><description><![CDATA[<a href="http://handlebarsjs.com/" rel="nofollow">Handlebars</a> and 
+<a href="http://mustache.github.com/" rel="nofollow">Mustache</a> template support]]></description><version>139.70</version><vendor email='' url='https://github.com/dmarcotte'>dmarcotte / JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='139.69' until-build='139.2147483647'/><change-notes><![CDATA[]]></change-notes><depends>com.intellij.modules.lang</depends><rating>4.6</rating></idea-plugin><idea-plugin downloads='32386' size='70697' date='1362597156000' url=''><name>TYPO3 TypoScript Support</name><id>com.jetbrains.typoscript</id><description><![CDATA[Typo3 language TypoScript support]]></description><version>0.1.1</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='126.319' /><change-notes><![CDATA[]]></change-notes><depends>com.intellij.modules.lang</depends><rating>4.1</rating></idea-plugin><idea-plugin downloads='68401' size='46040' date='1427900188000' url=''><name>Ini4Idea</name><id>com.jetbrains.plugins.ini4idea</id><description><![CDATA[Provides &quot;.ini&quot; files support.]]></description><version>138.826</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='138.0' until-build='142.381'/><change-notes><![CDATA[PhpStorm EAP 138.826 verion]]></change-notes><depends>com.intellij.modules.lang</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='11080' size='242031' date='1431008124000' url=''><name>GLSL Support</name><id>GLSL</id><description><![CDATA[Support for the OpenGL Shading Language]]></description><version>1.7.1</version><vendor email='' url=''>Foundation</vendor><idea-version min="n/a" max="n/a" since-build='139.1117' /><change-notes><![CDATA[Recommended if you have 1.7]]></change-notes><depends>com.intellij.modules.lang</depends><rating>3.3</rating></idea-plugin><idea-plugin downloads='6178' size='62600' date='1367583013000' url=''><name>NEON support</name><id>NEON support</id><description><![CDATA[Nette Object Notation - ne-on.org]]></description><version>0.2</version><vendor email='' url=''>juzna.cz</vendor><idea-version min="n/a" max="n/a" since-build='111.0' /><change-notes><![CDATA[finally it seems to work now]]></change-notes><depends>com.intellij.modules.lang</depends><depends>com.jetbrains.php</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='76528' size='1363049' date='1427146837000' url='http://ignatov.github.com/intellij-erlang'><name>Erlang</name><id>org.jetbrains.erlang</id><description><![CDATA[Erlang plugin]]></description><version>0.5.11.139</version><vendor email='ignatovs@gmail.com' url=''>Sergey Ignatov</vendor><idea-version min="n/a" max="n/a" since-build='139.222' until-build='139.2147483647'/><change-notes><![CDATA[<p>0.5.11</p> 
+<ul> 
+ <li>New inspection: multiple function exports</li> 
+ <li>Fixed false-positive error highlighting (<a href="https://github.com/ignatov/intellij-erlang/issues/499" rel="nofollow">#499</a>, <a href="https://github.com/ignatov/intellij-erlang/issues/505" rel="nofollow">#505</a>)</li> 
+ <li>Reworked Erlang/OTP version detection (<a href="https://github.com/ignatov/intellij-erlang/issues/514" rel="nofollow">#514</a>)</li> 
+ <li>Improved &quot;Export Function&quot; intention action (<a href="https://github.com/ignatov/intellij-erlang/issues/440" rel="nofollow">#440</a>)</li> 
+ <li>Improved debugger (<a href="https://github.com/ignatov/intellij-erlang/issues/501" rel="nofollow">#501</a>, <a href="https://github.com/ignatov/intellij-erlang/issues/546" rel="nofollow">#546</a>)</li> 
+ <li>New completion variant: e.g. ```ilfo``` completes to ```io_lib:format()```</li> 
+ <li>Improved specification resolution</li> 
+ <li>Setup Project SDK notification for small IDEs (<a href="https://github.com/ignatov/intellij-erlang/issues/569" rel="nofollow">#569</a>) </li>
+ <li>Bugfixes</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='90816' size='140348' date='1418990358000' url=''><name>Jade</name><id>com.jetbrains.plugins.jade</id><description><![CDATA[Support for 
+<a href="http://jade-lang.com/" rel="nofollow">Jade</a>, a template language for JavaScript]]></description><version>140.1212</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='139.659' /><change-notes><![CDATA[]]></change-notes><depends>com.intellij.css</depends><depends>com.intellij.modules.xml</depends><depends>JavaScript</depends><rating>4.1</rating></idea-plugin><idea-plugin downloads='2159' size='62763' date='1424596048000' url=''><name>Org4Idea</name><id>Org4Idea</id><description><![CDATA[An OrgMode editor for IntelliJ IDEA]]></description><version>0.2.0</version><vendor email='skuro@skuro.tk' url='http://skuro.tk'>Carlo Sciolla</vendor><idea-version min="n/a" max="n/a" since-build='107.105' /><change-notes><![CDATA[Added many new features, including: spellcheck support, live templates, keyword / block highlight, commenter]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='6314' size='39041' date='1427257377000' url=''><name>JSFL Support</name><id>JSFL Support</id><description><![CDATA[Support of JSFL, the scripting language for automating Adobe Flash.]]></description><version>3.1.2</version><vendor email='' url=''>Evgeniy Polyakov</vendor><idea-version min="n/a" max="n/a" since-build='133.193' until-build='141.2147483647'/><change-notes><![CDATA[<p>3.1.2</p> Compatible with IntelliJ IDEA 14.1. 
+<p>3.1.1</p> Reworked annotations in JSFL API: 
+<ul> 
+ <li>Added braces in @type and @return annotations.</li> 
+ <li>Added missing array element types.</li> 
+ <li>Added ElementFindAndSelect type.</li> 
+ <li>Added @class and @extends annotations.</li> 
+ <li>Changed {String} to {*} in trace methods.</li> 
+ <li>Added annotations for duck-typing objects like points, rectangles etc.</li> 
+ <li>Added annotations for alternative argument type, mostly for color values {String|Number}.</li> 
+ <li>Various fixes in API description.</li> 
+</ul> 
+<p>3.1.0</p> 
+<ul> 
+ <li>Language dialect of *.jsfl files has been set to JavaScript 1.8 since Flash environment supports it starting Flash CC. For the complete list of new language features see https://developer.mozilla.org/en-US/docs/Web/JavaScript/New_in_JavaScript/1.8.</li> 
+ <li>Added link to external documentation for most of API elements. The documentation is available via Shift+F1 or Quick Documentation Lookup. For more details see https://www.jetbrains.com/idea/help/viewing-external-documentation.html.</li> 
+ <li>Reworked description of JSFL API. All methods and fields are now defined in the prototype that allows to display more info in code completion and hints. Cache invalidation might be required to get updated JSFL libraries!</li> 
+ <li>Fixed description of some API elements (SpriteSheetExporter, SymbolInstance.useBackgroundColor, FontItem, etc)</li> 
+ <li>Added element type of all arrays.</li> 
+</ul> 
+<p>3.0.2</p> Compatible with IntelliJ IDEA 14. 
+<p>3.0.1</p> Compatible with IntelliJ IDEA 13.1. 
+<p>3.0.0</p> Compatible with IntelliJ IDEA 13. JSFL library has been updated for Flash CC http://help.adobe.com/en_US/flash/cs/extend/WS5b3ccc516d4fbf351e63e3d118a9024f3f-7fe7CS5.html 
+<p>2.1.1</p> Compatible with IntelliJ IDEA 12.1.6. 
+<p>2.1.0</p> Compatible with IntelliJ IDEA 12.1. 
+<p>2.0.2</p> Language dialect of *.jsfl files is set to JavaScript 1.6 because Flash environment uses this version of the language. Earlier language dialect depended on JavaScript settings. Now it is strictly defined. For more information see https://developer.mozilla.org/en-US/docs/JavaScript/New_in_JavaScript/1.6. 
+<p>2.0.1</p> Decreased JDK version. Now the plugin can be run on 1.6 JDK. 
+<p>2.0.0</p> Compatible with IntelliJ IDEA 12. 
+<p>1.1.1</p> Changed icons. Now they are more compatible with IntelliJ IDEA design. 
+<p>1.1</p> JSFL library has been verified according to an official documentation http://help.adobe.com/en_US/flash/cs/extend/index.html 
+<ul> 
+ <li>Added Flash CS5, CS5.5, CS6 API</li> 
+ <li>Added version information of each of API elements</li> 
+ <li>Removed API elements that are not available since Flash CS5: Screen, ScreenOutline, document versioning</li> 
+ <li>Added marking of optional method parameters</li> 
+ <li>Added marking of read-only properties</li> 
+</ul> 
+<p>1.0</p> 
+<ul> 
+ <li>JSFL files based on JavaScript files</li> 
+ <li>Core library for Flash CS5 and earlier versions</li> 
+ <li>Running JSFL files in associated application</li> 
+ <li>Templates for JSFL commands and tools</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><depends>JavaScript</depends><rating>00</rating></idea-plugin><idea-plugin downloads='1456' size='38702' date='1355751868000' url=''><name>JaggeryEditor</name><id>JaggeryEditorSupport</id><description><![CDATA[IDE support for Jaggery. Syntax highlighting, code completion and code formatting are enabled
+<br />]]></description><version>2.0</version><vendor email='' url='http://jaggeryjs.org/'>WSO2</vendor><idea-version min="n/a" max="n/a" since-build='123.72' /><change-notes><![CDATA[Code formatting for javascript part. 
+<br /> variables visible among blocks of tags]]></change-notes><depends>JavaScript</depends><rating>00</rating></idea-plugin><idea-plugin downloads='10050' size='49733' date='1385994104000' url=''><name>GNU GetText files support (*.po)</name><id>org.jetbrains.plugins.localization</id><description><![CDATA[This plugin enables support for GNU GetText files (*.po)]]></description><version>134.SNAPSHOT</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='130.1' /><change-notes><![CDATA[<ul> 
+ <li>Added spell-checking support (PY-11477)</li> 
+ <li>Fixed select word behavior (PY-7533)</li> 
+ <li>Added *.pot extension as default (PY-11161)</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='17891' size='139940' date='1385997930000' url=''><name>ReStructuredText Support</name><id>org.jetbrains.plugins.rest</id><description><![CDATA[This plugin enables support for reStructuredText files (*.rst)]]></description><version>134.SNAPSHOT</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='130.1' /><change-notes><![CDATA[<ul> 
+ <li>Added inspection for title &amp; underline length math (PY-10998)</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>4.5</rating></idea-plugin><idea-plugin downloads='14953' size='108334' date='1412928524000' url=''><name>Slim</name><id>org.jetbrains.plugins.slim</id><description><![CDATA[Slim language support]]></description><version>7.0.0.20141010</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='139.1' until-build='139.2147483647'/><change-notes><![CDATA[]]></change-notes><depends>com.intellij.modules.lang</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='60400' size='421681' date='1412928616000' url=''><name>Puppet Support</name><id>com.intellij.lang.puppet</id><description><![CDATA[This plugin provides Puppet language support. Current features include: 
+<ul> 
+ <li> Syntax highlighting and auto-formatting for puppet manifests written using either Puppet 3.x or Puppet 4 (future) language syntax; </li>
+ <li> Code assistance (completion, find usages, quick definition, etc.) for variables, classes, resource types and parameters, facts and external functions and types; </li>
+ <li> Unresolved symbols error highlighting; </li>
+ <li> Ability to set up several environments to use different <code>modulepath</code> for resolving symbols defined in modules and a mechanism to synchronize selected environment with the current git branch automatically. </li>
+</ul>]]></description><version>7.0.0.20141010</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='139.1' until-build='139.2147483647'/><change-notes><![CDATA[]]></change-notes><depends>com.intellij.modules.lang</depends><rating>2.8</rating></idea-plugin><idea-plugin downloads='833' size='164686' date='1364644578000' url='https://github.com/Ladicek/IntelliFrog'><name>IntelliFrog</name><id>cz.ladicek.intellifrog</id><description><![CDATA[SmartFrog Plugin for IntelliJ IDEA]]></description><version>0.4</version><vendor email='ladicek@gmail.com' url='http://ladicek.github.com/'>Ladislav Thon</vendor><idea-version min="n/a" max="n/a" since-build='123.72' /><change-notes><![CDATA[<p>0.4</p> 
+<ul> 
+ <li>code navigation</li> 
+ <li>code completion</li> 
+ <li>find usages</li> 
+ <li>rename refactoring</li> 
+ <li>safe delete</li> 
+</ul> 
+<p>0.3</p> 
+<ul> 
+ <li>two small parsing issue fixes</li> 
+ <li>navigate to Java class from arbitrary string</li> 
+ <li>navigate to SmartFrog script from #include</li> 
+ <li>completion of SmartFrog scripts inside #include</li> 
+</ul> 
+<p>0.2</p> 
+<ul> 
+ <li>small parsing issue fix</li> 
+ <li>structure view</li> 
+ <li>highlighting known attributes</li> 
+ <li>navigate to component class</li> 
+</ul> 
+<p>0.1</p> 
+<ul> 
+ <li>SmartFrog parsing with reasonable error recovery</li> 
+ <li>syntax highlighting</li> 
+ <li>brace matching</li> 
+ <li>commenting</li> 
+ <li>creating new .sf files</li> 
+ <li>keyword completion</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='11800' size='170787' date='1412104008000' url='https://github.com/raket/idea-silverstripe'><name>SilverStripe Template Language Support</name><id>com.raket.silverstripe</id><description><![CDATA[<a href="http://www.silverstripe.org/" rel="nofollow">SilverStripe</a> template language support
+<br /> 
+<br /> Issues, feature requests and contributions welcome: 
+<a href="https://github.com/raket/idea-silverstripe" rel="nofollow">https://github.com/raket/idea-silverstripe</a>]]></description><version>0.9.1.1</version><vendor email='marcus@raket.nu' url='https://github.com/raket/idea-silverstripe'>Raket
+        Webbyr√•</vendor><idea-version min="n/a" max="n/a" since-build='129.196' /><change-notes><![CDATA[<strong>Version 0.9.1.1</strong> 
+<ul> 
+ <li><b>Bugfixes</b></li> 
+ <li>Fix null pointer in class search</li> 
+ <li>Set never changed in cache provider</li> 
+ <li>Tested with PHPStorm 7.1.4 and 8.0.1</li> 
+</ul> 
+<strong>Version 0.9.1</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Fixed concurrency issues in variable resolves</li> 
+ <li>Exclude test classes from resolves</li> 
+ <li>Create live template context for SilverStripe templates</li> 
+ <li>Bundled live templates for all the common tags</li> 
+</ul> 
+<strong>Version 0.9</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>PHPStorm 6.0.1+ only</li> 
+ <li>Total parser rewrite</li> 
+ <li>Theme dir and theme file resolves</li> 
+ <li>Fix bug in translation identifiers</li> 
+ <li>Expanded variable resolves. Ctrl+clicking variables now also checks the db, has_one, has_many, many_many and belongs_many_many arrays.</li> 
+</ul> 
+<strong>Version 0.8.1</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Surround descriptors. By pressing ctrl+alt+t you can surround selected text with either an if, loop or with statement.</li> 
+</ul> 
+<strong>Version 0.8</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Variables are named elements</li> 
+ <li>Variable resolves. Ctrl+click will now try to resolve to a method with that name or a method prefixed by get.</li> 
+</ul> 
+<strong>Version 0.7.2</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Project component for tracking SilverStripe version</li> 
+ <li>Readded refactor to include insertion of include tag</li> 
+</ul> 
+<strong>Version 0.7.1</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Underscores are now valid in variable names.</li> 
+ <li>References added to require tag. The file names are now ctrl+clickable leading to the file in question. themedCSS is currently NOT theme aware and will suggest all matches.</li> 
+</ul> 
+<strong>Version 0.7</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Annotates free strings to allow easy conversion to strings or variables.</li> 
+ <li>Added &lt;, &lt;=, &gt;, &gt;= comparison operators with a warning if they are used in SilverStripe versions lower than 3.1.</li> 
+ <li>Added require tag.</li> 
+ <li>Fixed fatal error in include refactor when a project is opened without an open file.</li> 
+ <li>Change highlighting colors to align more with PHP.</li> 
+</ul> 
+<strong>Version 0.6.1</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Fixes reformat bug after removing text when refactoring to include file.</li> 
+ <li>Correctly parses advanced versions of loop, with and control.</li> 
+ <li>&quot;&lt;&quot; is no longer interpreted as a bad character.</li> 
+ <li>Typing &quot;{&quot; should now consistently yield &quot;{$}&quot;.</li> 
+</ul> 
+<strong>Version 0.6</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Refactor selected text to include file. This command moves the selected text to an include file. Defaults to ctrl+F6.</li> 
+ <li>Fix parser bug for else_if statements.</li> 
+</ul> 
+<strong>Version 0.5.1</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Major bugfix that would freeze the lexer in some cases.</li> 
+ <li>Add YAML references for translations. It is now possible to ctrl+click an element in a yaml translation file to find the corresponding tag.</li> 
+ <li>Gutter icon removed for include files.</li> 
+</ul> 
+<strong>Version 0.5</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Added the cached tag</li> 
+ <li>Proper parsing of translation tags</li> 
+ <li>Custom error messages for translation tag</li> 
+ <li>Parse advanced include statments</li> 
+ <li>Proper parsing of var statements</li> 
+ <li>Basic spellchecking</li> 
+ <li>Auto focus for autocomplete</li> 
+ <li>Bug fix in formatter</li> 
+</ul> 
+<strong>Version 0.4</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Proper file resolution for include statements. It's now possible to ctrl+click or command+click include statements directly to navigate to the correct file. We're keeping the icon in the gutter for clarity</li> 
+ <li>Bugfix for autocomplete of block statements. This both fixes a bug that missed the autocomplete and caused an exception when searching for files in some cases</li> 
+</ul> 
+<strong>Version 0.3</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Code completion for include statement. It will show a list of possible include files in the current project</li> 
+ <li>Annotation and quickfix of missing include files. A missing file will be annotated and can be quickfixed to automatically create the file</li> 
+ <li>Goto include file. Correct include statement shows a marker in the gutter that when clicked leads to the file</li> 
+ <li>Comments support. The plugin now supports the Code -&gt; Comment shortcuts and will create an SS shortcut around the selected text</li> 
+</ul> 
+<strong>Version 0.2</strong> 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Code completion for block statements Writing out the opening statement will autocomplete the closing statement</li> 
+ <li>Automatic placing of caret when pressing enter between start and close block</li> 
+ <li>Code formatting for both HTML and the SilverStripe template language.</li> 
+ <li>Proper parsing of if/else_if statements</li> 
+ <li>Basic support of &lt;%t %&gt;</li> 
+</ul> 
+<strong>Version 0.1</strong> 
+<br /> First version of the plugin. It brings basic tag recognition, syntax highlighting, brace matching and code folding. It also recognizes HTML as a separate language and allows the formatting of HTML inside an ss file. 
+<ul> 
+ <li><b>Features</b></li> 
+ <li>Basic tag recognition. Recognizes the following tags: 
+  <ul> 
+   <li>&lt;% if $Var %&gt; - &lt;% else_if %&gt; - &lt;% else %&gt; - &lt;% end_if %&gt;</li> 
+   <li>&lt;% loop $Var %&gt; - &lt;% end_loop %&gt;</li> 
+   <li>&lt;% with $Var %&gt; - &lt;% end_with %&gt;</li> 
+   <li>&lt;% control $Var %&gt; - &lt;% end_control %&gt;</li> 
+   <li>&lt;%-- Comment --%&gt;</li> 
+   <li>&lt;% include File %&gt;</li> 
+   <li>&lt;% base_tag %&gt;</li> 
+   <li>Var statements, both {$Var} and $Var is supported.</li> 
+  </ul> </li> 
+ <li>Basic syntax highlighting</li> 
+ <li>Brace matching</li> 
+ <li>Code folding</li> 
+ <li>HTML is recognized and can be formatted.</li> 
+ <li>Error messages for mismatching blocks and unexpected blocks.<br /> Error messages for syntax errors in Var statements. </li> 
+ <li>Message about unrecognized tags.</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><depends>com.jetbrains.php</depends><depends>org.jetbrains.plugins.yaml</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='14072' size='298366' date='1426898362000' url=''><name>Pig</name><id>org.apache.pig.plugin.idea</id><description><![CDATA[Apache Pig Language Plugin]]></description><version>1.7</version><vendor email='brandon.kearby at gmail com' url=''>Brandon Kearby &amp; Russell Melick</vendor><idea-version min="n/a" max="n/a" since-build='107.105' /><change-notes><![CDATA[IntelliJ - Pig Plugin 
+<p> Pig Plugin adds <a href="http://pig.apache.org" rel="nofollow">Apache Pig</a> Language support to <a href="http://www.jetbrains.com/idea" rel="nofollow">IntelliJ</a> Note: you may already have .pig files associated with the text editor. Go to IDE Settings -&gt; File Types to assign them to the pig plugin if nothing happens after you install it. </p> Features 
+<ul> 
+ <li>Find Usages and refactoring support for UDFs and pig variables</li> 
+ <li>Data Type Auto-completion on schema</li> 
+ <li>Keyword highlighting</li> 
+ <li>Code commenting/uncommenting</li> 
+ <li>Brace matching</li> 
+ <li>Syntax and errors highlighting</li> 
+ <li>Comment folding</li> 
+ <li>Doc Style Comments</li> 
+ <li>Custom Color Settings Page</li> 
+</ul> Change log Version 1.7 
+<ul> 
+ <li>Find Usages and refactoring support for UDFs and pig variables</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='44165' size='117033' date='1408647422000' url='https://github.com/yifanz/Intellij-Dust'><name>Dust</name><id>com.linkedin.intellij.dust</id><description><![CDATA[<a href="http://linkedin.github.com/dustjs/" rel="nofollow">Dust</a> Template Support 
+<br /> 
+<br /> Issues, feature requests, source code: 
+<a href="https://github.com/yifanz/Intellij-Dust" rel="nofollow">https://github.com/yifanz/Intellij-Dust</a>]]></description><version>0.3.8</version><vendor email='' url='https://github.com/yifanz'>Yi-Fan Zhang</vendor><idea-version min="n/a" max="n/a" since-build='110.0' /><change-notes><![CDATA[<b>Version 0.3.8</b> 
+<ul> 
+ <li> Allow hyphen inside of identifiers </li> 
+</ul> 
+<b>Version 0.3.7</b> 
+<ul> 
+ <li> Use system dependent file separator when resolving partials </li> 
+ <li> Fixed parsing errors with single period path expressions </li> 
+ <li> Allow multiple colon tags </li> 
+</ul> 
+<b>Version 0.3.6</b> 
+<ul> 
+ <li> Allow path expression inside subscript </li> 
+ <li> Fix bugs in subscript tokenizer rule </li> 
+</ul> 
+<b>Version 0.3.5</b> 
+<ul> 
+ <li> Allow self-closing section tags in grammar </li> 
+</ul> 
+<b>Version 0.3.4</b> 
+<ul> 
+ <li> Fixed bug with parsing numeric key tag </li> 
+</ul> 
+<b>Version 0.3.3</b> 
+<ul> 
+ <li> Fixed bug with using current context and numbers as attribute values </li> 
+</ul> 
+<b>Version 0.3.2</b> 
+<ul> 
+ <li> Fixed bug in comment parsing </li> 
+</ul> 
+<b>Version 0.3.1</b> 
+<ul> 
+ <li> Fixed compatibility issues with Intellij 11 and set it as the minimum supported version </li> 
+ <li> Fixed bugs in left curly brace and identifier token patterns in lexer </li> 
+</ul> 
+<b>Version 0.3</b> 
+<ul> 
+ <li> Added closing tag auto-completion </li> 
+ <li> Added dust partial tag goto reference shortcut &quot;Ctrl+b&quot; </li> 
+ <li> Fix parsing error on self closing block tags </li> 
+ <li> Fix brace matcher bug when key tags are used in attribute strings </li> 
+ <li> Remove redundant HTML pattern rules in Dust lexer </li> 
+</ul> 
+<b>Version 0.2</b> 
+<ul> 
+ <li> Added Dust brace match highlighting </li> 
+ <li> Added &quot;Ctrl+/&quot; shortcut for Dust comments </li> 
+ <li> Fix syntax highlighting for subscript operator in tags (e.g. {#section[0]}...{/section[0]}) </li> 
+ <li> Added TODO highlighting in comments </li> 
+</ul> 
+<b>Version 0.1.2</b> 
+<ul> 
+ <li> Fix syntax highlighting when javascript is present in template </li> 
+</ul> 
+<b>Version 0.1.1</b> 
+<ul> 
+ <li> Enable plugin for all JetBrain products </li> 
+</ul> 
+<b>Version 0.1</b> 
+<ul> 
+ <li> Provides syntax highlighting for Dust templates </li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='2279' size='18643' date='1367528457000' url=''><name>Nette framework helpers</name><id>Nette framework helpers</id><description><![CDATA[Nette development with pleasure]]></description><version>0.1</version><vendor email='' url=''>juzna.cz</vendor><idea-version min="n/a" max="n/a" since-build='129.1' /><change-notes><![CDATA[]]></change-notes><depends>com.intellij.modules.lang</depends><depends>com.jetbrains.php</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='8854' size='4045077' date='1421196629000' url='http://mathematicaplugin.halirutan.de'><name>Mathematica Support</name><id>de.halirutan.mathematica</id><description><![CDATA[Mathematica support for IntelliJIDEA. Includes syntax highlighting, function completion, documentation lookup, refactoring, code formatting, etc. This plugin is currently under heavy development. If you want to help, check out the 
+<a href="http://mathematicaplugin.halirutan.de" rel="nofollow">Official Website</a> for more information or take a look at the open-source 
+<a href="https://github.com/halirutan/Mathematica-IntelliJ-Plugin" rel="nofollow">GitHub repository</a>.]]></description><version>0.3.4</version><vendor email='pscheibe@trm.uni-leipzig.de' url='http://mathematicaplugin.halirutan.de'>Patrick Scheibe</vendor><idea-version min="n/a" max="n/a" since-build='135.1230' /><change-notes><![CDATA[With this release the support for Wolfram Language version 10 should be complete. Now, all new syntax as well as autocompletion and documentation lookup will work for all newly introduced functions.]]></change-notes><depends>com.intellij.modules.lang</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='20826' size='8104673' date='1410283596000' url='http://ligasgr.github.io/intellij-xquery/'><name>XQuery Support</name><id>org.intellij.xquery</id><description><![CDATA[Provides support for XQuery language in version 3.0]]></description><version>2.2.0</version><vendor email='ligasgr@gmail.com' url='http://grzegorzligas.blogspot.com/'>Grzegorz Ligas</vendor><idea-version min="n/a" max="n/a" since-build='132.947' until-build='139.2147483647'/><change-notes><![CDATA[<p>2.2.0:</p> 
+<ul> 
+ <li>Improve insertion of completed items with namespace prefix.</li> 
+ <li>Improve completion of functions and variables when prefix and part of the name are present.</li> 
+ <li>Issue <a href="https://github.com/ligasgr/intellij-xquery/issues/110" rel="nofollow">#110</a> - Add backwards compatibility with Marklogic language extensions.</li> 
+ <li>Issue <a href="https://github.com/ligasgr/intellij-xquery/issues/111" rel="nofollow">#111</a> - Color Issues.</li> 
+ <li>Issue <a href="https://github.com/ligasgr/intellij-xquery/issues/112" rel="nofollow">#112</a> - Faulty error reported using ml-1.0 syntax.</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='2173' size='302986' date='1373819086000' url=''><name>LiveScriptIdea</name><id>org.livescriptidea</id><description><![CDATA[Plugin for LiveScript language support]]></description><version>0.1.7</version><vendor email='racklin@gmail.com' url='https://github.com/racklin/livescript-idea'>Rack Lin</vendor><idea-version min="n/a" max="n/a" since-build='80.9000' /><change-notes><![CDATA[0.1.7 changes: 
+<ul> 
+ <li>[feature]Add LiveScript File Watcher To Compile LiveScript File To JavaScirpt.</li> 
+</ul> 0.1.6 changes: 
+<ul> 
+ <li>[feature]Add Preview Compiled LiveScript File</li> 
+</ul> 0.1.5 changes: 
+<ul> 
+ <li>[feature]Add &lt;&lt;&lt; &lt;&lt;&lt;&lt; import super let export var from keywords</li> 
+ <li>[feature]Add backticks ` support</li> 
+</ul> 0.1.4 changes: 
+<ul> 
+ <li>[feature]Add CodeStyle with a Code Style settings preference pane</li> 
+</ul> 0.1.3 changes: 
+<ul> 
+ <li>[feature]LiveScript File / Class Templates</li> 
+ <li>[bugfix]Fixes some lexer statements</li>
+ <li> </li>
+</ul>]]></change-notes><depends>com.intellij.modules.ultimate</depends><depends>JavaScript</depends><rating>00</rating></idea-plugin><idea-plugin downloads='579' size='1536682' date='1416095378000' url=''><name>Textmapper</name><id>org.textmapper.idea</id><description><![CDATA[Textmapper support for IntelliJ 12.1+ 
+<br /> 
+<b>Features:</b>
+<br /> 
+<ul> 
+ <li>Customizable syntax highlighting</li> 
+ <li>Navigation (go to declaration)</li> 
+ <li>Find usages, Rename, File structure</li> 
+ <li>On-the-fly validation, compiler</li> 
+</ul>]]></description><version>0.9.4</version><vendor email='egryaznov@gmail.com' url='http://textmapper.org/'>Evgeny Gryaznov</vendor><idea-version min="n/a" max="n/a" since-build='129.713' /><change-notes><![CDATA[]]></change-notes><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.platform</depends><rating>00</rating></idea-plugin><idea-plugin downloads='29664' size='52822' date='1390986342000' url=''><name>EJS</name><id>com.jetbrains.lang.ejs</id><description><![CDATA[<a href="http://embeddedjs.com/" rel="nofollow">EJS</a> support]]></description><version>133.745</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='133.620' /><change-notes><![CDATA[<ul> 
+ <li>Initial support</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><depends>JavaScript</depends><rating>2.3</rating></idea-plugin><idea-plugin downloads='17832' size='62719' date='1413187854000' url=''><name>Twig Support</name><id>com.jetbrains.twig</id><description><![CDATA[Twig Template Language Support]]></description><version>139.58</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='139.1' /><change-notes><![CDATA[]]></change-notes><depends>com.intellij.modules.ultimate</depends><rating>00</rating></idea-plugin><idea-plugin downloads='24123' size='89034' date='1412768855000' url=''><name>Stylus support</name><id>org.jetbrains.plugins.stylus</id><description><![CDATA[Stylus language support]]></description><version>139.2</version><vendor email='' url=''>JetBrains</vendor><idea-version min="n/a" max="n/a" since-build='139.2' until-build='140.0'/><change-notes><![CDATA[]]></change-notes><depends>com.intellij.modules.lang</depends><depends>com.intellij.css</depends><rating>4.0</rating></idea-plugin><idea-plugin downloads='638' size='803354' date='1384246147000' url=''><name>DeftIDEA</name><id>org.dylanfoundry.deft</id><description><![CDATA[<p>This plugin provides support for the <a href="http://opendylan.org/" rel="nofollow">Dylan</a> programming language.</p>]]></description><version>0.4.2</version><vendor email='' url='http://dylanfoundry.org/'>Dylan Foundry</vendor><idea-version min="n/a" max="n/a" since-build='129.239' /><change-notes><![CDATA[<p>0.4.2</p> 
+<ul> 
+ <li>Initial support for smart indenting as you type. This doesn't dedent yet.</li> 
+ <li>Add live templates for define suite (defs) and define test (defte).</li> 
+ <li>Fix another null pointer exception.</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='4467' size='66240' date='1402147517000' url='https://github.com/webschik/idea-doT'><name>doT</name><id>com.webschik.doT</id><description><![CDATA[Plugin for 
+<a href="http://olado.github.io/doT/index.html" rel="nofollow">doT.js</a> templates support. 
+<br /> 
+<a href="https://www.liqpay.com/?do=clickNbuy&amp;button=i67533662223" rel="nofollow">Donate with LiqPay</a>]]></description><version>1.5.4</version><vendor email='' url='https://github.com/webschik'>webschik</vendor><idea-version min="n/a" max="n/a" since-build='107.105' /><change-notes><![CDATA[Add change notes here.
+<br /> 
+<small>most HTML tags may be used</small>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='10801' size='663304' date='1431387014000' url=''><name>Pascal IDEA Plugin</name><id>com.siberika.idea.pascal</id><description><![CDATA[Pascal support for IDEA.
+<br />]]></description><version>0.92</version><vendor email='argb32@gmail.com' url='http://www.siberika.com/pasidea.htm'>siberika.com</vendor><idea-version min="n/a" max="n/a" since-build='133.0' /><change-notes><![CDATA[<p>0.92</p> 
+<ul> 
+ <li>file structure view</li> 
+ <li>syntax highlighting in decompiled files</li> 
+ <li>completion improve</li> 
+ <li>new icons</li> 
+</ul> 
+<p>0.91</p> 
+<ul> 
+ <li>statements completion</li> 
+ <li>support of nested type, variable and constant declarations</li> 
+ <li>exception variables in except clause resolving</li> 
+ <li>binary and octal numbers support (OBJFPC)</li> 
+</ul> 
+<p>0.9</p> 
+<ul> 
+ <li>initial Delphi RTL support</li> 
+ <li>scoped unit names support</li> 
+ <li>basic generics support</li> 
+ <li>moved built-in identifiers source file</li> 
+</ul> 
+<p>0.87</p> 
+<ul> 
+ <li>major completion improvement</li> 
+ <li>fixed variant record handling</li> 
+ <li>added support of some keywords</li> 
+ <li>support .pp extension for unit files</li> 
+</ul> 
+<p>0.86</p> 
+<ul> 
+ <li>WITH statement support while resolving</li> 
+ <li>multiple parents support while resolving</li> 
+</ul> 
+<p>0.85</p> 
+<ul> 
+ <li>resolving of identifiers within complex expressions</li> 
+ <li>routine parameters info display</li> 
+ <li>fixed ppu decompilation issues under Windows</li> 
+</ul> 
+<p>0.83</p> 
+<ul> 
+ <li>expressions parser</li> 
+ <li>formatting and indentation improve</li> 
+</ul> 
+<p>0.82</p> 
+<ul> 
+ <li>large files parsing performance improve</li> 
+ <li>bug fixes</li> 
+</ul> 
+<p>0.81</p> 
+<ul> 
+ <li>unit name completion</li> 
+ <li>module rename refactoring</li> 
+ <li>module file templates</li> 
+</ul> 
+<p>0.8</p> 
+<ul> 
+ <li>full references/find usages</li> 
+ <li>completion improvement</li> 
+</ul> 
+<p>0.7.5</p> 
+<ul> 
+ <li>code formatter</li> 
+</ul> 
+<p>0.7.1</p> 
+<ul> 
+ <li>regression fixes</li> 
+</ul> 
+<p>0.7</p> 
+<ul> 
+ <li>IDEA 14 support</li> 
+ <li>improved completion</li> 
+ <li>stable parser</li> 
+ <li>standard FPC installation layouts support (including OSX)</li> 
+</ul> 
+<p>0.6</p> 
+<ul> 
+ <li>PPU viewer</li> 
+</ul> 
+<p>0.5</p> 
+<ul> 
+ <li>context-aware code completion</li> 
+ <li>undeclared identifiers highlighting and quick fix</li> 
+ <li>rename refactoring</li> 
+ <li>find usages</li> 
+ <li>navigation: class method definition &lt;=&gt; implementation</li> 
+ <li>navigation: unit routine interface definition &lt;=&gt; implementation</li> 
+ <li>Pascal syntax highlighting</li> 
+ <li>program compilation with FPC and running</li> 
+ <li>first public version</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.platform</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='690' size='60629' date='1399493810000' url=''><name>Conkitty</name><id>com.hoho.conkitty</id><description><![CDATA[Conkitty Template Engine Support]]></description><version>0.5.0</version><vendor email='dakota@brokenpipe.ru' url='https://github.com/hoho'>Marat Abdullin</vendor><idea-version min="n/a" max="n/a" since-build='107.105' /><change-notes><![CDATA[Conkitty 0.5.x support.]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='21772' size='1474196' date='1430065635000' url='https://github.com/shalupov/idea-cloudformation'><name>AWS CloudFormation support</name><id>AWSCloudFormation</id><description><![CDATA[Amazon AWS CloudFormation language support]]></description><version>0.3.20</version><vendor email='shalupov@diverse.org.ru' url='https://github.com/shalupov/idea-cloudformation'>Leonid Shalupov</vendor><idea-version min="n/a" max="n/a" since-build='139.661' until-build='141.2147483647'/><change-notes><![CDATA[Sync to CloudFormation docs]]></change-notes><depends>com.intellij.modules.lang</depends><rating>5.0</rating></idea-plugin><idea-plugin downloads='23129' size='169940' date='1424519353000' url=''><name>IntelliBot</name><id>com.millennialmedia.intellibot</id><description><![CDATA[IntelliBot, adding intelligence to Robot 
+<p>The IntelliBot plugin for IntelliJ/Pycharm adds features to the <a href="http://robotframework.org/" rel="nofollow">Robot Framework</a>. This includes:</p> 
+<ul> 
+ <li>Syntax Highlighting</li> 
+ <li>Code Completion</li> 
+ <li>Jump to Source</li> 
+ <li>Undefined Keywords</li> 
+ <li>Undefined Resources</li> 
+ <li>Undefined Variables</li> 
+ <li>Python support</li> 
+ <li>Code Inspections</li> 
+</ul> 
+<p>Find us in <a href="https://github.com/millennialmedia/intellibot" rel="nofollow">Github</a>.</p>]]></description><version>0.6.5</version><vendor email='intellibot@millennialmedia.com' url='http://www.millennialmedia.com'>Millennial Media</vendor><idea-version min="n/a" max="n/a" since-build='107.105' /><change-notes><![CDATA[0.6.5 
+<ul> 
+ <li>fix resolving of relative imports (thanks to Kidlike)</li> 
+ <li>add option to capitalize keywords (thanks to puhnastik)</li> 
+</ul> 0.6.4 
+<ul> 
+ <li>add transitive import support</li> 
+ <li>add support for python community version</li> 
+ <li>add config page for debug logging</li> 
+</ul> 0.6 
+<ul> 
+ <li>performance improvements</li> 
+ <li>enable import not used (resource) by default</li> 
+ <li>better handle import file finding</li> 
+ <li>some variable handling and inspections</li> 
+</ul> 0.5 
+<ul> 
+ <li>better keyword resolution</li> 
+ <li>Minor parser fixes</li> 
+</ul> 0.4 
+<ul> 
+ <li>Added support for ellipsis</li> 
+ <li>Updated file icon</li> 
+ <li>Added better handling of super space on auto-complete keywords</li> 
+ <li>Add better detection around inline variables</li> 
+ <li>Added better detection of variable declarations (still not great IDE support)</li> 
+ <li>Added some inspections (Gherkin, Import Not Found, Keyword Not Found)</li> 
+ <li>Minor parser fixes</li> 
+</ul> 0.3 
+<ul> 
+ <li>Cleaned up some of the recommended syntax</li> 
+ <li>Cleaned up where the recommended syntax appears (not perfect but better)</li> 
+ <li>Enabled code completion for pycharm python libraries</li> 
+ <li>Minor parser fixes</li> 
+</ul> 0.2.4 
+<ul> 
+ <li>added python support for pycharm</li> 
+ <li>added code completion for python functions</li> 
+</ul> 2014-01-08 
+<ul> 
+ <li>Added support for Python Libraries; import and jump-to-source</li> 
+</ul> 2013-12-24 
+<ul> 
+ <li>Added support for Variables and User Keywords</li> 
+ <li>Local and remote jump-to-source work</li> 
+ <li>Local and remote code completion</li> 
+ <li>Have address some stack overflow bugs</li> 
+</ul> 2013-11-18 
+<ul> 
+ <li>Initial Release after Hack-a-thon</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>4.7</rating></idea-plugin><idea-plugin downloads='12932' size='21114113' date='1423323248000' url='https://github.com/asciidoctor/asciidoctor-intellij-plugin'><name>AsciiDoc</name><id>org.asciidoctor.intellij.asciidoc</id><description><![CDATA[<p><a href="http://www.methods.co.nz/asciidoc/" rel="nofollow">AsciiDoc</a> language support for IntelliJ platform.</p>
+<p> </p>
+<p>AsciiDoc is a text document format, similar to formats like Markdown, for writing notes, documentation, articles, books, ebooks, slideshows, web pages, man pages and blogs. AsciiDoc files can be translated to many formats including HTML, PDF, EPUB, man page. AsciiDoc is, in constrast to Markdown, highly configurable: both the AsciiDoc source file syntax and the backend output markups (which can be almost any type of SGML/XML markup) can be customized and extended by the user.</p>]]></description><version>0.8</version><vendor email='erik.pragt@jworks.nl' url='http://asciidoctor.org'>Asciidoctor Project</vendor><idea-version min="n/a" max="n/a" since-build='107.105' /><change-notes><![CDATA[<ul> 
+ <li>0.8 Fixed incompatibility with non-IDEA IDE's, thanks to Harro Lissenberg</li> 
+ <li>0.7 Added table creation thanks Harro Lissenberg. Also added basic formatting, and fixed IntelliJ 14.1 incompatibility.</li> 
+ <li>0.6 Convert from Markdown to AsciiDown. Tooltip background colors fixed thanks to Harro Lissenberg, and error handling fixed thanks to Alexander Schwartz. Thanks!!<br /> Fixed issues: <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/43" rel="nofollow">GITHUB-43</a>, <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/41" rel="nofollow">GITHUB-41</a>, <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/33" rel="nofollow">GITHUB-33</a>. <br /> Also: removed .asc file extension.<br /> </li>
+ <li>0.5.1 Bugfix release, see <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/21" rel="nofollow">PULL-21</a></li> 
+ <li>0.5 Upgraded to version 1.5.2 of AsciiDoc, and a small bugfix in the styling for bold items.</li> 
+ <li>0.4 Upgraded to JRuby 1.7.16.1 to fix bugs, initial Darcula support.<br /> Live preview, relative images and includes fixed, thanks to Alexander Schwartz!<br /> Fixed issues: <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/21" rel="nofollow">GITHUB-21</a>, <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/20" rel="nofollow">GITHUB-20</a>, <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/16" rel="nofollow">GITHUB-16</a>, <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/18" rel="nofollow">GITHUB-18</a>.<br /> </li> 
+ <li>0.3 Upgraded to version 1.5.1 of AsciiDoc</li> 
+ <li>0.2 Fixed issues: <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/8" rel="nofollow">GITHUB-8</a>, <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/9" rel="nofollow">GITHUB-9</a>, <a href="https://github.com/asciidoctor/asciidoctor-intellij-plugin/issues/10" rel="nofollow">GITHUB-10</a>.<br /> Small cleanup (renamed tab, changed tab sequence) </li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='419' size='61111' date='1396257492000' url=''><name>Coocoo</name><id>com.hoho.coocoo</id><description><![CDATA[Coocoo DSL for MVC applications]]></description><version>0.0.5</version><vendor email='dakota@brokenpipe.ru' url='https://github.com/hoho'>Marat Abdullin</vendor><idea-version min="n/a" max="n/a" since-build='107.105' /><change-notes><![CDATA[Plugin is in early development stage.]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='5738' size='352732' date='1419552424000' url=''><name>Rust</name><id>vektah.rust</id><description><![CDATA[Language support for the 
+<a href="http://www.rust-lang.org/" rel="nofollow">Rust Language</a>
+<br />
+<br /> 
+<em>PLEASE NOTE</em>: This does not yet do any auto completion. It is JUST the lexer and highlighting for .rs files. The rest is coming soon!]]></description><version>0.0.4</version><vendor email='adam@vektah.net' url='http://github.com/Vektah/idea-rust'>Vektah</vendor><idea-version min="n/a" max="n/a" since-build='40.131' /><change-notes><![CDATA[<ul> 
+ <li><b>0.0.4</b>: Support for rust 0.13, Run cargo from editor, Structure view, Auto commenting, Smart indentation, Create new rust file from editor</li> 
+ <li><b>0.0.3</b>: Added expression support, disabled wildcards. Grammar should now be more or less complete</li> 
+ <li><b>0.0.2</b>: Added grammar support for functions, structs, use, traits, externals, lets, types, struct tuples and static vars</li> 
+ <li><b>0.0.1</b>: Initial plugin</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>4.4</rating></idea-plugin><idea-plugin downloads='22796' size='2698284' date='1425046079000' url=''><name>Haskell</name><id>Haskell</id><description><![CDATA[Haskell language support]]></description><version>0.5.0</version><vendor email='' url='http://www.jetbrains.com/'>JetBrains Inc.</vendor><idea-version min="n/a" max="n/a" since-build='139.225' /><change-notes><![CDATA[<ul> 
+ <li>advanced highlighting</li> 
+ <li>go to declaration (in progress)</li> 
+ <li>find usages (in progress)</li> 
+ <li>tool for logging ghc-modi</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><depends>com.intellij.modules.xdebugger</depends><depends>com.intellij.modules.platform</depends><rating>4.1</rating></idea-plugin><idea-plugin downloads='6185' size='103588' date='1402247405000' url=''><name>Latte</name><id>com.jantvrdik.intellij.latte</id><description><![CDATA[Provides support for 
+<a href="https://github.com/nette/latte/" rel="nofollow">Latte</a> ‚Äì a template engine for PHP.]]></description><version>0.1.1</version><vendor email='' url=''>Jan Tvrd√≠k</vendor><idea-version min="n/a" max="n/a" since-build='133.326' /><change-notes><![CDATA[<p>0.1.1</p> 
+<ul> 
+ <li>implemented basic html tags and macros folding</li> 
+ <li>typing '}' is ignored when the next character is '}'</li> 
+</ul> 
+<p>0.1.0-rc1 / 0.1.0</p> 
+<ul> 
+ <li>selecting attribute macro from code-completion list auto-inserts =&quot;&quot; and put caret inside those quotes</li> 
+</ul> 
+<p>0.1.0-beta3</p> 
+<ul> 
+ <li>typing '{' auto-inserts '}'</li> 
+</ul> 
+<p>0.1.0-beta2</p> 
+<ul> 
+ <li>fixed minimum required IDEA build number to 133.326</li> 
+</ul> 
+<p>0.1.0-beta1</p> 
+<ul> 
+ <li>registering new macro will force re-analyzing of all project files</li> 
+</ul> 
+<p>0.1.0-alpha7</p> 
+<ul> 
+ <li>name of closing HTML tag must be the same the opening tag</li> 
+ <li>implemented basic commenter</li> 
+ <li>hard coded fix for macro _ which can be both pair and unpaired</li> 
+</ul> 
+<p>0.1.0-alpha6</p> 
+<ul> 
+ <li>implemented support for custom attribute macros</li> 
+ <li>only a single top-level {block} macro can be auto-closed</li> 
+</ul> 
+<p>0.1.0-alpha5</p> 
+<ul> 
+ <li>plugin is now really compatible with Java 6</li> 
+</ul> 
+<p>0.1.0-alpha4</p> 
+<ul> 
+ <li>implemented support for custom macros</li> 
+ <li>macros are auto-closed at end of file</li> 
+</ul> 
+<p>0.1.0-alpha3</p> 
+<ul> 
+ <li>plugin should be compatible with Java 6</li> 
+ <li>new icon for Latte file</li> 
+</ul> 
+<p>0.1.0-alpha2</p> 
+<ul> 
+ <li>fixed macro comment priority when macro comment contained a quote</li> 
+</ul>]]></change-notes><depends>com.intellij.modules.lang</depends><rating>4.9</rating></idea-plugin><idea-plugin downloads='4506' size='24257' date='1422124648000' url=''><name>Tree syntax highlighter</name><id>ru.hyoo.jin.tree</id><description><![CDATA[<a href="http://hyoo.ru/?article=%D0%A4%D0%BE%D1%80%D0%BC%D0%B0%D1%82+Tree;author=Nin+Jin" rel="nofollow">Tree</a> - very simple, readable, compact structural format. Better than xml, json, yaml and other.
+<br /> 
+<a href="https://github.com/nin-jin/tree-plugin" rel="nofollow">Sources: https://github.com/nin-jin/tree-plugin</a>
+<br />]]></description><version>1.3</version><vendor email='nin-jin@ya.ru' url='http://hyoo.ru'>Jin</vendor><idea-version min="n/a" max="n/a" since-build='40.131' /><change-notes><![CDATA[better error hlighting]]></change-notes><depends>com.intellij.modules.lang</depends><rating>00</rating></idea-plugin><idea-plugin downloads='28850' size='371564' date='1430750788000' url=''><name>TypoScript Plugin</name><id>de.sgalinski.typoscript.plugin.id</id><description><![CDATA[<img alt="Logo - SGalinski Internet Services" src="http://cdn.sgalinski.de/_Resources/Static/Packages/SGalinski.SgalinskiDe/Images/logo.png" />  
+<br />
+<br />
+<br />
+<br />
+<br />
+<br />
+<br /> 
+<p> <strong>Please uninstall the TypoScript plugin from Intellij before you install this one, because this combination can lead to crashes and unforeseeable problems.</strong> </p>

@@ -5,20 +5,19 @@
         {{--@yield('content')--}}
     <div class="main-div-white">
         <div class="container">
-            <div class="row">
-                <div class="col-md-8"><h2><small>ШИНЭ МЭДЭЭ</small></h2></div>
-                <div class="col-md-4 text-right more"><a href="/articles" >Нийт мэдээ<span class="glyphicon glyphicon-th btn-lg" aria-hidden="true"></span></a></div>
+            <div class="row headerspace">
+                <div class="col-md-8"><h3>Шинэ мэдээ</h3></div>
+                <div class="col-md-4 text-right"><a href="/articles" >Нийт мэдээ</a></div>
             </div>
             @if(count($news)>0)
                 <div class="row">
                     @foreach($news as $new)
                         <div class="col-md-4">
                             <article>
-                                {!! Html::image($new->thumbnail, '',array('id' => 'thumb')) !!}
-
-                                <h4><a href="{{ url('/articles', $new->id) }}">{{ str_limit( $new->title, 55, '...') }}</a></h4>
-                                {{--<span>Бичсэн: {!! $new->user->name !!}</span><br>--}}
-                                <footer><cite title="Source Title">Хугацаа: {{ $new->created_at }}</cite></footer>
+                                <img src="" width="293" height="220" class=""/>
+                                <h4><a href="{{ url('/articles', $new->id) }}">{{ $new->title }}</a></h4>
+                                <span>Бичсэн: {!! $new->user->name !!}</span><br>
+                                <span class="bg">Хугацаа: {{ $new->created_at }}</span><br>
                                 {{--<div class="body">{{ $articles->content }}</div>--}}
                             </article>
                         </div>
@@ -31,21 +30,21 @@
 
         <div class="main-div">
             <div class="container">
-                <div class="row">
-                    <div class="col-md-8"><h2><small>ФОТО ЦОМОГ</small></h2></div>
-                    <div class="col-md-4 text-right more"><a href="#" >Нийт мэдээ<span class="glyphicon glyphicon-th btn-lg" aria-hidden="true"></span></a></div>
+                <div class="row headerspace">
+                    <div class="col-md-8"><h3>Фото цомог</h3></div>
+                    <div class="col-md-4 text-right"><a href="#" >Нийт фото</a></div>
                 </div>
                 <div class="row">
                     <div class="col-md-6">
                         <article>
-                            <img src="/images/photos/2.jpg" width="455" height="325" class=""/>
-                            <h4><a href="#">Солонгос</a></h4>
+                            <img src="" width="455" height="325" class=""/>
+                            <h4><a href="#">123</a></h4>
                         </article>
                     </div>
                     <div class="col-md-6">
                         <article>
-                            <img src="/images/photos/1.jpg" width="455" height="325" class=""/>
-                            <h4><a href="#">Америк</a></h4>
+                            <img src="" width="455" height="325" class=""/>
+                            <h4><a href="#">123</a></h4>
                         </article>
                     </div>
                 </div>
@@ -53,18 +52,18 @@
         </div>
         <div class="main-div-white">
             <div class="container">
-                <div class="row">
-                    <div class="col-md-8"><h2><small>ШИЛДЭГ ОЮУТАН</small></h2></div>
-                    <div class="col-md-4 text-right more"><a href="categories/5" >Нийт шилдэг оюутан<span class="glyphicon glyphicon-th btn-lg" aria-hidden="true"></span></a></div>
+                <div class="row headerspace">
+                    <div class="col-md-8"><h3>Шилдэг Оюутан</h3></div>
+                    <div class="col-md-4 text-right"><a href="#" >Нийт мэдээ</a></div>
                 </div>
                 @if(count($students)>0)
                     <div class="row">
                         @foreach($students as $student)
                             <div class="col-md-4">
                                 <article>
-                                    {!! Html::image($student->thumbnail, '',array('id' => 'thumb')) !!}
+                                    <img src="" width="293" height="220" class=""/>
                                     <h4><a href="{{ url('/articles', $student->id) }}">{{ $student->title }}</a></h4>
-{{--                                    <span>Бичсэн: {{ $student->user->name }}</span><br>--}}
+                                    <span>Бичсэн: {!! $student->user->name !!}</span><br>
                                     <span class="bg">Хугацаа: {{ $student->created_at }}</span><br>
                                     {{--<div class="body">{{ $articles->content }}</div>--}}
                                 </article>
@@ -76,20 +75,20 @@
         </div>
         <div class="main-div">
             <div class="container">
-                <div class="row">
-                    <div class="col-md-8"><h2><small>ВИДЕО</small></h2></div>
-                    <div class="col-md-4 text-right more"><a href="#">Нийт мэдээ<span class="glyphicon glyphicon-th btn-lg" aria-hidden="true"></span></a></div>
+                <div class="row headerspace">
+                    <div class="col-md-8"><h3>Видео</h3></div>
+                    <div class="col-md-4 text-right"><a href="#" >Нийт видео</a></div>
                 </div>
                 <div class="row">
                     <div class="col-md-6">
                         <article>
-                            <h4><a href="#">INHA University</a></h4>
+                            <h4><a href="#">123</a></h4>
                             <iframe width="455" height="260" src="//www.youtube.com/embed/z8JoRkBczUM" frameborder="0" allowfullscreen=""></iframe>
                         </article>
                     </div>
                     <div class="col-md-6">
                         <article>
-                            <h4><a href="#">Hanseo University</a></h4>
+                            <h4><a href="#">123</a></h4>
                             <iframe width="455" height="260" src="//www.youtube.com/embed/uYfXT4VEXq8" frameborder="0" allowfullscreen=""></iframe>
                         </article>
                     </div>

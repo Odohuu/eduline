@@ -14,7 +14,6 @@
                 <li class="{{ Request::is('/home') ? 'active' : '' }}"><a href="/home">Нүүр</a></li>
                 <li class="{{ Request::is('/articles') ? 'active' : '' }}"><a href="/articles">Нийтлэл</a></li>
                 <li class="{{ Request::is('/categories') ? 'active' : ''}}"><a href="/categories">Ангилал</a></li>
-                <li class="{{ Request::is('/photos') ? 'active' : ''}}"><a href="/photos">Зураг</a></li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
                 {{--<li>{!! link_to_action('ArticlesController@show',$latest->title, [$latest->id]) !!}</li>--}}

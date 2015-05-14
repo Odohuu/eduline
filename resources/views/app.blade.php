@@ -4,33 +4,21 @@
 	<meta charset="utf-8">
 	<title>Eduline admin</title>
 
-	<link href="{{ asset('css/app.css') }}" rel="stylesheet">
-	<!-- Fonts -->
-    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700,300,600,800,400&subset=cyrillic,cyrillic-ext' rel='stylesheet' type='text/css'>
-
-    {{--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>--}}
-    {{--<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>--}}
-
-    {{--editor--}}
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
-    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet">
-
-    <script src="{{ asset('js/summernote.js') }}"></script>
-    <link href="{{ asset('css/summernote.css') }}" rel="stylesheet">
-
-    <script type="text/javascript">
-        $(function() {
-            $('.summernote').summernote({
-                height: 500
-            });
-        });
-    </script>
-    {{--select2--}}
-    <link href="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.0-rc.2/css/select2.min.css" rel="stylesheet">
-
+	<link href="{{ asset('/css/app.css') }}" rel="stylesheet">
     {{--jcrop--}}
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-jcrop/0.9.12/css/jquery.Jcrop.min.css">
+	<!-- Fonts -->
+	<link href='//fonts.googleapis.com/css?family=Roboto:400' rel='stylesheet' type='text/css'>
+
+
+    {{--select2--}}
+    <link href="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.0-rc.2/css/select2.min.css" rel="stylesheet" />
+    {{--editor--}}
+    <link rel="stylesheet" type="text/css" href="{{ asset('/css/bootstrap-wysihtml5.css') }}">
+
+    <script src="{{ asset('js/wysihtml5-0.3.0.js') }}"></script>
+    <script src="{{ asset('js/bootstrap.min.js') }}"></script>
+    <script src="{{ asset('js/bootstrap-wysihtml5.js') }}"></script>
 
 </head>
 <body>
@@ -94,10 +82,13 @@
         {{--</div>--}}
     </div>
 
+    <!-- editor -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.1/js/bootstrap.min.js"></script>
     {{--select2--}}
     <script src="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.0-rc.2/js/select2.min.js"></script>
     {{--jcrop--}}
-    {{--<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-jcrop/0.9.12/js/jquery.Jcrop.min.js"></script>--}}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-jcrop/0.9.12/js/jquery.Jcrop.min.js"></script>
     {{--<script>--}}
 
         {{--var modal;--}}
@@ -132,9 +123,9 @@
         {{--}--}}
     {{--</script>--}}
 
-    {{--<script>--}}
-{{--//        $('div.alert').not('.alert-important').delay(3000).slideUp(300);--}}
-    {{--</script>--}}
+    <script>
+        $('div.alert').not('.alert-important').delay(3000).slideUp(300);
+    </script>
     @yield('footer')
 </body>
 </html>

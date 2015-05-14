@@ -2,13 +2,12 @@
 
 @section('content')
     <div class="page-header">
-        <h2>{{ $article->title }}</h2>
+        <h1>{{ $article->title }}</h1>
     </div>
-    <div></div>
     <a>{{ $article->category_id }}</a>
     <p>{{ $article->created_at }}</p>
     <article>
-        <p>{!! $article->content !!}</p>
+        {{ $article->content }}
     </article>
 
     {{--@unless($articles->tags->isEmpty())--}}
@@ -19,8 +18,4 @@
             {{--@endforeach--}}
         {{--</ul>--}}
     {{--@endunless--}}
-    <br />
-    <br />
-    <br />
-    <hr />
 @stop

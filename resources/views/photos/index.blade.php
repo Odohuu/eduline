@@ -13,10 +13,10 @@
         @foreach($photos as $photo)
             <tr>
                 <th scope="row">{{ $photo->id }}</th>
-                <td style="height: 140px;">{!! Html::image($photo->path, $photo->name, array('width' => 120)) !!}</td>
                 <td>{{ $photo->path }}</td>
+                <td>{!! Html::image($photo->path, $photo->name) !!}</td>
                 <td>{{ $photo->name }}</td>
-                <td><a class="btn btn-warning" href="{{ url('photos/'. $photo->id .'/edit', '') }}" role="button">Засах</a></td>
+                {{--<td><a class="btn btn-warning" href="{{ url('categories/'. $category->id. '/edit', '') }}" role="button">Засах</a></td>--}}
             </tr>
         @endforeach
         </tbody>

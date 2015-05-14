@@ -15,7 +15,7 @@ class CategoriesController extends Controller {
      */
     public function __construct()
     {
-        $this->middleware('auth', ['except' => 'show']);
+        $this->middleware('auth');
     }
 
 	/**
@@ -60,14 +60,11 @@ class CategoriesController extends Controller {
 	 * @param  int  $id
 	 * @return Response
 	 */
-	public function show($id)
+	public function show(Category $category)
 	{
-//        $id = $category->id->()
-//        $articles = Category::findOrFail($id)->articles()->latest('created_at')->published()->get();
+        $category = $category->articles()->published()->get;
 
-        $articles = Category::findOrFail($id)->articles()->latest('created_at')->published()->get();
-
-        return view('categories.show',compact('articles'));
+        return view('categories.show',compact('category'));
 	}
 
 	/**
@@ -106,7 +103,7 @@ class CategoriesController extends Controller {
 	 */
 	public function destroy($id)
 	{
-        $category = User::findOrFail($id);
+        $category = User::findOfFail($id);
 
         $category->delete();
 

@@ -20,13 +20,8 @@ class PagesController extends Controller {
         return view('pages.contact');
     }
 
-    public function usa()
+    public function country()
     {
-        return view('pages.usa');
-    }
-
-    public function school()
-    {
-        return view('pages.school');
+        return view('pages.country');
     }
 }

@@ -5,7 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Article extends Model {
 
-    protected $fillable = ['category_id','title', 'content', 'published_at','thumbnail'];
+    protected $fillable = ['category_id','title', 'content', 'published_at'];
 
     protected $dates = ['published_at'];
 

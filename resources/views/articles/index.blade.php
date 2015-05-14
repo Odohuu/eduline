@@ -2,20 +2,13 @@
 
 @section('content')
 	<div class="page-header">
-        <h3 class="text-uppercase">НИЙТ МЭДЭЭ</h3>
+        <h1>Мэдээ</h1>
     </div>
-    @foreach(array_chunk($articles->all(),3) as $row)
-        <div class="row content-space">
-                @foreach($row as $article)
-                    <div class="col-md-4">
-                        <article>
-                            {!! Html::image($article->thumbnail, '',array('id' => 'thumb')) !!}
-                            <h4><a href="{{ url('/articles', $article->id) }}">{{ $article->title }}</a></h4>
-                            <footer><cite title="Source Title">Хугацаа: {{ $article->created_at }}</cite></footer>
-                {{--            <div class="body">{{ $article->content }}</div>--}}
-                        </article>
-                    </div>
-                @endforeach
-        </div>
+    @foreach($articles as $article)
+        <article>
+            <h2><a href="{{ url('/articles', $article->id) }}">{{ $article->title }}</a></h2>
+            <p>{{ $article->created_at }}</p>
+            <div class="body">{{ $article->content }}</div>
+        </article>
     @endforeach
 @stop

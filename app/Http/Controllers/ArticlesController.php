@@ -18,14 +18,14 @@ class ArticlesController extends Controller {
      */
     public function __construct()
     {
-        $this->middleware('auth', ['except' => ['index', 'show']]);
+        $this->middleware('auth', ['except' => 'index', 'show']);
     }
     /**
      * @return \Illuminate\View\View
      */
     public function index()
 	{
-		$articles = Category::findOrFail(1)->articles()->latest('created_at')->published()->get();
+		$articles = Article::latest('published_at')->published()->get();
 
         return view('articles.index', compact('articles'));
 	}
@@ -74,9 +74,9 @@ class ArticlesController extends Controller {
      */
     public function edit(Article $article)
     {
-        $category = Category::lists('name', 'id');
+//        $tags = Tag::lists('name', 'id');
 
-        return view('articles.edit', compact('article', 'category'));
+        return view('articles.edit', compact('article'));
     }
 
     public function update(ArticleRequest $request, Article $article)
