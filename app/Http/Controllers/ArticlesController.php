@@ -18,17 +18,24 @@ class ArticlesController extends Controller {
      */
     public function __construct()
     {
-        $this->middleware('auth', ['except' => 'index', 'show']);
+        $this->middleware('auth', ['except' => ['index', 'show']]);
     }
     /**
      * @return \Illuminate\View\View
      */
     public function index()
 	{
-		$articles = Article::latest('published_at')->published()->get();
+		$articles = Category::findOrFail(1)->articles()->latest('created_at')->published()->get();
 
         return view('articles.index', compact('articles'));
 	}
+
+    public function all()
+    {
+        $articles = Article::latest('created_at')->get();
+
+         return view('articles.all', compact('articles'));
+    }
 
     /**
      * @param Article $article
@@ -46,11 +53,10 @@ class ArticlesController extends Controller {
      */
     public function create()
     {
-        //$tags = Tag::lists('name', 'id');
-//        , compact('tags')
-        $category = Category::lists('name', 'id');
 
-        return view('articles.create', compact('category'));
+        $categories = Category::lists('name', 'id');
+        
+        return view('articles.create', compact('categories'));
     }
 
     /**
@@ -65,7 +71,7 @@ class ArticlesController extends Controller {
 
         flash()->success('Шинээр нийтлэл үүсгэгдлээ');
 
-        return redirect('articles');
+        return redirect('allArticles');
     }
 
     /**
@@ -75,8 +81,9 @@ class ArticlesController extends Controller {
     public function edit(Article $article)
     {
 //        $tags = Tag::lists('name', 'id');
+        $categories = Category::lists('name', 'id');
 
-        return view('articles.edit', compact('article'));
+        return view('articles.edit', compact('article', 'categories' ));
     }
 
     public function update(ArticleRequest $request, Article $article)
@@ -86,7 +93,7 @@ class ArticlesController extends Controller {
 
 //        $this->SyncTags($articles, $request->input('tag_list'));
 
-        return redirect('articles');
+        return redirect('allArticles');
     }
 
     public function destroy(Article $article)

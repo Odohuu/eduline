@@ -1,21 +1,14 @@
 @extends('app2')
 
 @section('content')
-    <div class="page-header">
-        <h1>{{ $article->title }}</h1>
+	<div class="container show-left">
+	    <hr />
+	    <h4>{{ $article->title }}</h4>
+	    <!-- <a>{{ $article->category_id }}</a> -->
+	    <!-- <p class="date">{{ $article->created_at }}</p> -->
+	    <article>
+	        {!! $article->content !!}
+	    </article>
     </div>
-    <a>{{ $article->category_id }}</a>
-    <p>{{ $article->created_at }}</p>
-    <article>
-        {{ $article->content }}
-    </article>
-
-    {{--@unless($articles->tags->isEmpty())--}}
-        {{--<h5>Ангилал:</h5>--}}
-        {{--<ul>--}}
-            {{--@foreach($articles->tags as $tag)--}}
-                {{--<li>{{ $tag->name }}</li>--}}
-            {{--@endforeach--}}
-        {{--</ul>--}}
-    {{--@endunless--}}
+    <div class="space"></div>
 @stop

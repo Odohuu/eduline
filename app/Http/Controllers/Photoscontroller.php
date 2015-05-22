@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Input;
 use Intervention\Image\Facades\Image;
 
-class Photoscontroller extends Controller {
+class PhotosController extends Controller {
 
     public function __construct()
     {
@@ -18,7 +18,7 @@ class Photoscontroller extends Controller {
 
     public function index()
     {
-        $photos = Photo::all();
+        $photos = Photo::latest('created_at')->get();
 
         return view('photos.index', compact('photos'));
     }
@@ -30,22 +30,31 @@ class Photoscontroller extends Controller {
 
     public function store()
     {
-//        $file = Input::file('photo');
-//        $extension = $file->getClientOriginalExtension();
-//        $filename = time().'.'.$extension;
-//
-//        $upload_success = $file->move('images', $filename);
-//
-//        Photo::create(array('imageName' => 'images/'.$filename ));
-
         $input = Input::all();
         $path = public_path() .'/images/articles/';
         $fileName = $input['fileName']->getClientOriginalName();
-        Photo::create(array('path' => 'images/articles/'. '300x300-' .$fileName, 'name' => $input['name'] ));
-        $image = Image::make($input['fileName']->getRealPath());
-        File::exists($path) or File::makeDirectory($path);
-//        $image->save(public_path().'/images/' . Auth::user()->name . '/' . $input['filename']->getClientOriginalName();
-        $image->crop(300, 300)->save($path . '300x300-' . $fileName);
+
+        if (Input::get('checkImage') === '1')
+        {
+            Photo::create(array('path' => 'http://eduline.dev/images/articles/' .$fileName, 'name' => $input['name'] ));
+            $image = Image::make($input['fileName']->getRealPath());
+            File::exists($path) or File::makeDirectory($path);
+            $image->save($path . $fileName, 100);
+        }
+        else
+        {
+            if (Input::get('checkImage') === '2')
+            {
+                Photo::create(array('path' => 'http://eduline.dev/images/articles/'. '300x300-' .$fileName, 'name' => $input['name'] ));
+                $image = Image::make($input['fileName']->getRealPath());
+                File::exists($path) or File::makeDirectory($path);
+                $image->crop(300, 300)->save($path . '300x300-' . $fileName, 100);
+            }
+            else
+            {
+                return Redirect('photos');
+            }
+        }
 
         return Redirect('photos');
     }
@@ -54,5 +63,16 @@ class Photoscontroller extends Controller {
     {
         return view('photos.show', compact('photo'));
     }
+
+    public function thumbnail(Photo $photo)
+    {
+//        $photo->findOrFail()
+//        return view('', compact(''));
+    }
+
+     public function edit(Photo $photo)
+     {
+        return view('photos.edit', compact('photo' ));
+     }
 
 }

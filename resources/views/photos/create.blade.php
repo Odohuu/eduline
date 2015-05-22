@@ -6,8 +6,13 @@
     <hr/>
 
     {!! Form::open(['route' => 'photos.store', 'files' => true]) !!}
-        {{--{{ Form::hidden('user_id', Auth::user()->id) }}--}}
-
+        
+        <div class="form-group">
+            {!! Form::label('name','энгийн зураг:') !!}
+            {!! Form::radio('checkImage', 1, true, ['class' => 'field']) !!}
+            {!! Form::label('name','мэдээний нүүр зураг:') !!}
+            {!! Form::radio('checkImage', 2, false, ['class' => 'field']) !!}
+        </div>
         <div class="form-group">
             {!! Form::label('name','name:') !!}
             {!! Form::text('name',null, ['class'=>'form-control']) !!}

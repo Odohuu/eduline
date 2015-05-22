@@ -15,7 +15,7 @@ class CategoriesController extends Controller {
      */
     public function __construct()
     {
-        $this->middleware('auth');
+        $this->middleware('auth', ['except' => ['show']]);
     }
 
 	/**
@@ -47,7 +47,7 @@ class CategoriesController extends Controller {
 	 */
 	public function store(CategoryRequest $request)
 	{
-
+		
         Category::create($request->all());
 //        flash()->success('Шинээр нийтлэл үүсгэгдлээ');
 
@@ -60,11 +60,11 @@ class CategoriesController extends Controller {
 	 * @param  int  $id
 	 * @return Response
 	 */
-	public function show(Category $category)
+	public function show($id)
 	{
-        $category = $category->articles()->published()->get;
-
-        return view('categories.show',compact('category'));
+        $articles = Category::findOrFail($id)->articles()->orderBy('created_at')->get();
+        $Category = Category::findOrFail($id);
+        return view('categories.show',compact('articles', 'Category'));
 	}
 
 	/**

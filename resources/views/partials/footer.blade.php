@@ -1,31 +1,5 @@
-<div class="footer">
+<footer>
     <div class="container">
-            <div class="row">
-                <div class="col-md-2">
-                    <h3>Улаанбаатар</h3>
-                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n720/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
-                </div>
-                <div class="col-md-2">
-                    <h3>New York</h3>
-                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n179/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
-                </div>
-                <div class="col-md-2">
-                    <h3>Tokyo</h3>
-                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n248/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
-                </div>
-                <div class="col-md-2">
-                    <h3>Vancouver</h3>
-                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n256/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
-                </div>
-                <div class="col-md-2">
-                    <h3>Canberra</h3>
-                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n57/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
-                </div>
-                <div class="col-md-2">
-                    <h3>Korea</h3>
-                    <iframe src="http://free.timeanddate.com/clock/i4ns7dyp/n57/tluk/fs16/fc154845/ftb/pa3/th1" frameborder="0" width="71" height="24"></iframe>
-                </div>
-            </div>
         <div class="row topspace">
             <div class="col-md-3">
                 <h4>Сайтын тухай</h4>
@@ -71,4 +45,4 @@
             <p>@2004-2015 ЭДҮЛАЙН ХХК</p>
         </div>
     </div>
-</div>
+</footer>

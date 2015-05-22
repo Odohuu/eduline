@@ -14,7 +14,7 @@
         </div>
     {!! Form::close() !!}
 
-    {!! delete_form(['ArticlesController@destroy', $article->id]) !!}
+    {{--{!! delete_form(['ArticlesController@destroy', $article->id]) !!}--}}
 
     @include('errors.list')
 

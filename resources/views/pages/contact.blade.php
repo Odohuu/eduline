@@ -4,7 +4,7 @@
 
     <div class="container">
         <div class="page-header">
-            <h2>Хаяг</h2>
+            <h3>Хаяг</h3>
         </div>
         <div class="row">
             <div class="col-md-6">
@@ -19,5 +19,5 @@
             </div>
         </div>
     </div>
-
+    <div class="space"></div>
 @stop

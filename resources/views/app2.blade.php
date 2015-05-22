@@ -4,25 +4,23 @@
     <meta charset="utf-8">
     <title>Eduline LLC</title>
 
-    <link href='//fonts.googleapis.com/css?family=Lato:100' rel='stylesheet' type='text/css'>
     {{--css--}}
-    <link href="{{ asset('/css/style.css') }}" rel="stylesheet">
     <link href="{{ asset('/css/app.css') }}" rel="stylesheet">
+    <link href="{{ asset('/css/style.css') }}" rel="stylesheet">
+    
     {{--slide--}}
     <link href="{{ asset('/css/owl.carousel.min.css') }}" rel="stylesheet">
     <link href="{{ asset('/css/owl.theme.default.min.css') }}" rel="stylesheet">
 
-    {{--editor--}}
-    <link rel="stylesheet" type="text/css" href="{{ asset('/css/bootstrap-wysihtml5.css') }}">
     <!-- Fonts -->
-    <link href='http://fonts.googleapis.com/css?family=Roboto:400,300,500&subset=cyrillic,cyrillic-ext' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,600,400&subset=cyrillic-ext' rel='stylesheet' type='text/css'>
 
-    {{--editor--}}
-    <script src="{{ asset('js/wysihtml5-0.3.0.js') }}"></script>
-    <script src="{{ asset('js/bootstrap.min.js') }}"></script>
-    <script src="{{ asset('js/bootstrap-wysihtml5.js') }}"></script>
+
+    <!-- js -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+
     {{--slide--}}
-    <script src="{{ asset('js/jquery.min.js') }}"></script>
     <script src="{{ asset('js/owl.carousel.min.js') }}"></script>
 
 </head>
@@ -31,11 +29,10 @@
     @include('partials.homeNav')
 
     @yield('welcome')
-    <div class="container">
-        @yield('content')
-    </div>
-    <hr />
-    @include('pages.tuslah')
+    @yield('school')
+    
+    @yield('content')
+    
     @include('partials.footer')
 
 </body>

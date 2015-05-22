@@ -2,11 +2,11 @@
 
 @section('content')
 
-    <h1>Шинээр нийтлэл оруулах</h1>
+    <h4>Шинээр нийтлэл оруулах</h4>
     <hr/>
 
     {!! Form::model($article = new \App\Article,['url' => 'articles']) !!}
-        @include('articles.form', ['submitButtonText' => 'Нийтлэл үүсгэх'])
+        @include('articles.form', ['submitButtonText' => 'Ангилал үүсгэх'])
     {!! Form::close() !!}
 
     @include('errors.list')

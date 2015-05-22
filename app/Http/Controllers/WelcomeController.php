@@ -1,6 +1,7 @@
 <?php namespace App\Http\Controllers;
 
 use App\Article;
+use App\Category;
 
 class WelcomeController extends Controller {
 
@@ -32,10 +33,12 @@ class WelcomeController extends Controller {
 	 */
 	public function index()
 	{
-        $news = Article::latest('published_at')->published()->limit('3')->orderBy('created_at')->get();
-        $students = Article::latest('published_at')->published()->limit('3')->orderBy('created_at')->get();
-//        , compact('articles')
-		return view('welcome', compact('news', 'students'));
+		$news = Category::findOrFail(1)->articles()->latest('created_at')->limit('3')->get();
+		// dd($news);
+		$students = Category::findOrFail(5)->articles()->latest('published_at')->published()->limit('3')->orderBy('created_at')->get();
+		$videos = Category::findOrFail(6)->articles()->latest('published_at')->limit('3')->orderBy('created_at')->get();
+
+		return view('welcome', compact('news', 'students', 'videos'));
 	}
 
 

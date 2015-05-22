@@ -879,7 +879,7 @@ html {
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 body {
-  font-family: "Roboto", Helvetica, Arial, sans-serif;
+  font-family: 'Open Sans', sans-serif;
   font-size: 14px;
   line-height: 1.42857143;
   color: #333333;
@@ -2714,7 +2714,7 @@ select[multiple].form-group-lg .form-control {
 .btn {
   display: inline-block;
   margin-bottom: 0;
-  font-weight: 400;
+  font-weight: 300;
   text-align: center;
   vertical-align: middle;
   -ms-touch-action: manipulation;
@@ -5501,7 +5501,7 @@ button.close {
   z-index: 1070;
   display: block;
   visibility: visible;
-  font-family: "Roboto", Helvetica, Arial, sans-serif;
+  font-family: 'Open Sans', sans-serif;
   font-size: 12px;
   font-weight: normal;
   line-height: 1.4;
@@ -5608,7 +5608,7 @@ button.close {
   display: none;
   max-width: 276px;
   padding: 1px;
-  font-family: "Roboto", Helvetica, Arial, sans-serif;
+  font-family: 'Open Sans', sans-serif;
   font-size: 14px;
   font-weight: normal;
   line-height: 1.42857143;
@@ -6229,7 +6229,7 @@ button.close {
 body,
 label,
 .checkbox label {
-  font-weight: 400;
+  font-weight: 300;
 }
 .container {
   width: 970px;
@@ -6238,10 +6238,13 @@ h1,
 h2,
 h3,
 h4 {
-  font-weight: 400;
-  color: #277d7a;
+  font-weight: 300;
+  color: #525961;
   margin-top: 15px;
   margin-bottom: 10px;
+}
+h4 {
+  font-size: 18px;
 }
 a {
   color: #174744;
@@ -6250,9 +6253,6 @@ a {
 a:hover {
   color: #20976d;
   text-decoration: none;
-}
-.navbar {
-  magrin-bottom: 0;
 }
 .page-header {
   margin: 40px 0 20px;

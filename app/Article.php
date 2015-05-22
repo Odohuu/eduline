@@ -5,7 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Article extends Model {
 
-    protected $fillable = ['category_id','title', 'content', 'published_at'];
+    protected $fillable = ['category_id','title', 'content', 'published_at','thumbnail'];
 
     protected $dates = ['published_at'];
 
@@ -44,21 +44,5 @@ class Article extends Model {
         return $this->belongsTo('App\Category');
     }
 
-    /**
-     * Get the tags associated with the given articles.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
-     */
-//    public function tags()
-//    {
-//        return $this->belongsToMany('App\Tag')->withTimestamps();
-//    }
-//
-//    /**
-//     * @return array
-//     */
-//    public function getTagListAttribute()
-//    {
-//        return $this->tags->lists('id');
-//    }
+
 }

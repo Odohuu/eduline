@@ -1,25 +1,23 @@
         <div class="main-slide">
         <div class="container-slide">
-            <div class="cloud1"><a href="#" class="btn-link">Нийт онцлох</a></div>
+            <!-- <div class="cloud1"><a href="#" class="btn-link">Нийт онцлох</a></div> -->
             <div class="owl-carousel" style="position: relative;">
                 <div class="slide01" >
-                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 50px; bottom: 50px; z-index: 1; ">Дэлгэрэнгүй</a>
-                    <img src="{{url('/images/slides/niseh.jpg')}}">
+                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 480px; bottom: 30px; z-index: 1; ">Дэлгэрэнгүй</a>
+                    <div style="height:390px;background:url('http://eduline.dev/images/slides/20150503-1920x360-slide.jpg') no-repeat center top;"></div>
+                    <!-- <img src="{{url('/images/slides/niseh.jpg')}}"> -->
                 </div>
                 <div class="slide02">
-                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 50px; bottom: 50px; z-index: 1; ">Дэлгэрэнгүй</a>
+                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 480px; bottom: 30px; z-index: 1; ">Дэлгэрэнгүй</a>
                     <img src="{{url('/images/slides/usa-study.jpg')}}">
                 </div>
                 <div class="slide03">
-                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 50px; bottom: 50px; z-index: 1; ">Дэлгэрэнгүй</a>
-                    <img src="{{url('/images/slides/slide01.png')}}"></div>
-                <div class="slide04" >
-                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 50px; bottom: 50px; z-index: 1; ">Дэлгэрэнгүй</a>
-                    <img src="{{url('/images/slides/America.jpg')}}">
+                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 480px; bottom: 30px; z-index: 1; ">Дэлгэрэнгүй</a>
+                    <img src="{{url('/images/slides/slide01.png')}}">
                 </div>
                 <div class="slide04" >
-                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 50px; bottom: 50px; z-index: 1; ">Дэлгэрэнгүй</a>
-                    <img src="{{url('/images/slides/Korea-tulbur.jpg')}}">
+                    <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 480px; bottom: 30px; z-index: 1; ">Дэлгэрэнгүй</a>
+                    <img src="{{url('/images/slides/niseh.jpg')}}">
                 </div>
             </div>
             <script>

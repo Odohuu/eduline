@@ -25,7 +25,8 @@ class ArticleRequest extends Request {
             'category_id' => 'required|integer',
 			'title' => 'required|min:3',
             'content' => 'required',
-            'published_at' => 'required|date'
+            'published_at' => 'required|date',
+            'thumbnail' => 'required'
 		];
 	}
 
