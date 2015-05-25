@@ -9,9 +9,9 @@
         <div class="row">
             <div class="col-md-6">
                 <article>
-                    <section><a>{{ $school->country_id }}</a></section>
+                    <p><a>{!! Html::image($flagPath, '', array('height' => 40,'class' => 'flag')) !!}</a></p>
                     <section>
-                        <a>{{ $school->rank }}</a>
+                        <a>Сургуулийн зурэглэл: {{ $school->rank }}</a>
                         <p>{!! str_limit( $school->description, 650) !!}</p>
                     </section>
                 </article>

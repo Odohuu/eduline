@@ -183,6 +183,9 @@ nav.main2 .main2-nav-fixed li a{
     font-size: 24px;
 }
 
+.flag{
+    border: 1px solid #eee;
+}
 /*layout start*/
 .layout{
     display: block;

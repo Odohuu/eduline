@@ -75,4 +75,9 @@ class PhotosController extends Controller {
         return view('photos.edit', compact('photo' ));
      }
 
+    public function destroy($id)
+    {
+        //
+    }
+
 }

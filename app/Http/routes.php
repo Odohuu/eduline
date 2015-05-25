@@ -16,7 +16,7 @@ Route::get('home', 'HomeController@index');
 
 Route::get('about', 'PagesController@about');
 Route::get('contact','PagesController@contact');
-Route::get('country','PagesController@country');
+// Route::get('country','PagesController@country');
 
 Route::resource('categories', 'CategoriesController');
 Route::resource('articles', 'ArticlesController');
@@ -24,7 +24,7 @@ Route::get('allArticles', 'ArticlesController@all');
 Route::resource('photos', 'PhotosController');
 Route::get('thumbnail', 'PhotosController@thumbnail');
 Route::resource('schools', 'SchoolsController');
-Route::resource('country', 'CountriesController');
+Route::resource('countries', 'CountriesController');
 
 Route::get('editor','WelcomeController@editor');
 

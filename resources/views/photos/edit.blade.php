@@ -26,6 +26,11 @@
             {{ Form::submit('Upload Photo', ['class'=>'btn btn-primary ']) }}
         </div>
 
+        {!! Form::model($photo, ['method'=>'DELETE', 'action' => ['ArticlesController@destroy', $photo->id]]) !!}
+        <div class="form-group">
+            {!! Form::submit('Устгах', ['class'=>'btn btn-danger ']) !!}
+        </div>
+
     {!! Form::close() !!}
 
 @stop

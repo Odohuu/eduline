@@ -26,28 +26,9 @@
     </div>
 
 
-        <div class="main-div">
-            <div class="container">
-                <div class="row">
-                    <div class="col-md-8"><h3>Фото цомог</h3></div>
-                    <div class="col-md-4 text-right"><a href="#" >Нийт фото</a></div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <article>
-                            <img src="" width="455" height="325" class=""/>
-                            <h4><a href="#">123</a></h4>
-                        </article>
-                    </div>
-                    <div class="col-md-6">
-                        <article>
-                            <img src="" width="455" height="325" class=""/>
-                            <h4><a href="#">123</a></h4>
-                        </article>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- <div class="main-div">
+
+        </div> -->
         <div class="main-div-white">
             <div class="container">
                 <div class="row">

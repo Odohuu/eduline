@@ -24,6 +24,7 @@
     <script type="text/javascript">
         $(function() {
             $('#summernote').summernote({
+                width: 865,
                 height: 350
             });
         });

@@ -61,7 +61,8 @@ class SchoolsController extends Controller {
 	public function show($id)
 	{
 		$school = School::findOrFail($id);
-		return view('schools.show', compact('school'));
+		$flagPath = Country::findOrFail($school->country_id)->flag;
+		return view('schools.show', compact('school', 'flagPath'));
 	}
 
 	/**

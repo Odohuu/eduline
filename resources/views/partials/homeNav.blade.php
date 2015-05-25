@@ -16,11 +16,11 @@
             <ul class="nav navbar-nav">
                 <li class="{{ Request::is('/') ? 'active' : '' }} text-uppercase"><a href="/">Эхлэл</a></li>
                 <li class="{{ Request::is('articles') ? 'active' : '' }} text-uppercase"><a href="/articles">Таны сонорт</a></li>
-                <li class="{{ Request::is('country') ? 'active' : '' }} text-uppercase"><a href="/country/1">Америк улс</a></li>
-                <li class="{{ Request::is('country') ? 'active' : '' }} text-uppercase"><a href="/country">Солонгос улс</a></li>
-                <li class="{{ Request::is('country') ? 'active' : '' }} text-uppercase"><a href="/country">Австрали улс</a></li>
-                <li class="{{ Request::is('country') ? 'active' : '' }} text-uppercase"><a href="/country">Канад улс</a></li>
-                <li class="{{ Request::is('country') ? 'active' : '' }} text-uppercase"><a href="/country">Япон улс</a></li>
+                <li class="{{ Request::is('countries') ? 'active' : '' }} text-uppercase"><a href="/countries/1">Америк улс</a></li>
+                <li class="{{ Request::is('countries') ? 'active' : '' }} text-uppercase"><a href="/countries/2">Солонгос улс</a></li>
+                <li class="{{ Request::is('countries') ? 'active' : '' }} text-uppercase"><a href="/countries/3">Австрали улс</a></li>
+                <li class="{{ Request::is('countries') ? 'active' : '' }} text-uppercase"><a href="/countries/4">Канад улс</a></li>
+                <li class="{{ Request::is('countries') ? 'active' : '' }} text-uppercase"><a href="/countries/5">Япон улс</a></li>
             </ul>
         </div>
 
