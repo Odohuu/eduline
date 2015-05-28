@@ -17,7 +17,7 @@
                 </article>
             </div>
             <div class="col-md-6">
-                <iframe width="440" height="248" src="//www.youtube.com/embed/{{ $school->media }}" frameborder="0" allowfullscreen=""></iframe>
+                {!! $school->media !!}
             </div>
         </div>
     </div>

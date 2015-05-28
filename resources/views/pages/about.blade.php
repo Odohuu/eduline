@@ -7,6 +7,7 @@
     <div class="page-header">
         <h2>Бидний тухай</h2>
     </div>
+<embed type="application/x-shockwave-flash" src="https://photos.gstatic.com/media/slideshow.swf" width="800" height="533" flashvars="host=picasaweb.google.com&hl=en_US&feat=flashalbum&RGB=0x000000&feed=https%3A%2F%2Fpicasaweb.google.com%2Fdata%2Ffeed%2Fapi%2Fuser%2F104355233903604105075%2Falbumid%2F5961198965304655201%3Falt%3Drss%26kind%3Dphoto%26authkey%3DGv1sRgCLumjOiAxpaMUA%26hl%3Den_US" pluginspage="http://www.macromedia.com/go/getflashplayer"></embed>
     <div class="row">
         <div class="tabpanel">
             <div class="col-md-8">

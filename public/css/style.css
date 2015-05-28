@@ -52,10 +52,6 @@ nav.main2{
     margin:0;
     border-top: 1px solid #dee0df;
     background-color: #fff;
-    background-image: -webkit-linear-gradient(top,#fff 65%,#f3f3f3);
-    background-image: -moz-linear-gradient(top,#fff 65%,#f3f3f3);
-    background-image: -ms-linear-gradient(#fff 65%,#f3f3f3 100%);
-    background-image: linear-gradient(to bottom,#fff 65%,#f3f3f3);
     border-bottom: 2px solid #B2C0BF;
     z-index: 5;
 }
