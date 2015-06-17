@@ -7,9 +7,6 @@ html {
     /*color: #174744;*/
     /*text-decoration: none;*/
 /*}*/
-a:hover{
-    color: #20976d;
-}
 p {
     line-height: 24px;
 }
@@ -42,7 +39,8 @@ nav.main1 ul.main1-nav li a{
     color: #849392;
 }
 nav.main1 ul.main1-nav li a:hover{
-    color: #277d7a;
+    color: #009D93;
+    background-color: #eee;
 }
 nav.main1 ul.main1-nav li.active{
     border-bottom: 1px solid #ccc;

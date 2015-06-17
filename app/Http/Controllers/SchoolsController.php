@@ -102,7 +102,9 @@ class SchoolsController extends Controller {
 	 */
 	public function destroy($id)
 	{
-		//
+		$school = School::findOrFail($id)->delete();
+
+        return redirect('schools');
 	}
 
 }

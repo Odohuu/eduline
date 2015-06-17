@@ -14,7 +14,7 @@
                     </div>
                 <div class="col-md-4">
                     <article>
-                        {!! Html::image('http://eduline.dev/images/articles/300x300-logo.jpg', '', array('width' => 300, 'height' => 300)) !!}
+                        {!! Html::image('http://edulinellc.mn/images/articles/300x300-logo.jpg', '', array('width' => 300, 'height' => 300)) !!}
                         <h4><a href=""></a></h4>
                         <br>
                         {{--<div class="body">{{ $articles->content }}</div>--}}

@@ -28,4 +28,5 @@
         @endforeach
         </tbody>
     </table>
+     <?php echo $articles->render(); ?>
 @stop

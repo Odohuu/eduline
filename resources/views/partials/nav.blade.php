@@ -17,7 +17,7 @@
                       <ul class="dropdown-menu" role="menu">
                         <li><a href="/allArticles">Нийт</a></li>
                         <li class="divider"></li>
-                        <li><a href="articles/create">Шинэээр үүсгэх</a></li>
+                        <li><a href="/articles/create">Шинэээр үүсгэх</a></li>
                       </ul>
                 </li>
                 <li class="{{ Request::is('categories') ? 'active' : '' }} dropdown">
@@ -25,7 +25,7 @@
                       <ul class="dropdown-menu" role="menu">
                         <li><a href="/categories">Нийт</a></li>
                         <li class="divider"></li>
-                        <li><a href="categories/create">Шинэээр үүсгэх</a></li>
+                        <li><a href="/categories/create">Шинэээр үүсгэх</a></li>
                       </ul>
                 </li>
                 <li class="{{ Request::is('photos') ? 'active' : '' }} dropdown">
@@ -33,7 +33,7 @@
                       <ul class="dropdown-menu" role="menu">
                         <li><a href="/photos">Нийт</a></li>
                         <li class="divider"></li>
-                        <li><a href="photos/create">Шинэээр үүсгэх</a></li>
+                        <li><a href="/photos/create">Шинэээр үүсгэх</a></li>
                       </ul>
                 </li>
                 <li class="{{ Request::is('schools') ? 'active' : '' }} dropdown">
@@ -41,7 +41,7 @@
                       <ul class="dropdown-menu" role="menu">
                         <li><a href="/schools">Нийт</a></li>
                         <li class="divider"></li>
-                        <li><a href="schools/create">Шинэээр үүсгэх</a></li>
+                        <li><a href="/schools/create">Шинэээр үүсгэх</a></li>
                       </ul>
                 </li>
                 

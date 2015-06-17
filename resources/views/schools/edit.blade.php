@@ -8,11 +8,11 @@
         @include('schools.form', ['submitButtonText' => 'Нийтлэл өөрчлөлт оруулах'])
     {!! Form::close() !!}
 
-    <!-- {!! Form::model($school, ['method'=>'DELETE', 'action' => ['ArticlesController@destroy', $school->id]]) !!}
+    {!! Form::model($school, ['method'=>'DELETE', 'action' => ['SchoolsController@destroy', $school->id]]) !!}
         <div class="form-group">
             {!! Form::submit('Устгах', ['class'=>'btn btn-danger ']) !!}
         </div>
-    {!! Form::close() !!} -->
+    {!! Form::close() !!}
 
     <!-- {{--{!! delete_form(['ArticlesController@destroy', $article->id]) !!}--}} -->
 

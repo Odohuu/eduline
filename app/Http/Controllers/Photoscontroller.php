@@ -18,7 +18,7 @@ class PhotosController extends Controller {
 
     public function index()
     {
-        $photos = Photo::latest('created_at')->get();
+        $photos = Photo::latest('created_at')->paginate(10);
 
         return view('photos.index', compact('photos'));
     }
@@ -31,24 +31,46 @@ class PhotosController extends Controller {
     public function store()
     {
         $input = Input::all();
-        $path = public_path() .'/images/articles/';
+        $path = public_path('images/articles/');
         $fileName = $input['fileName']->getClientOriginalName();
-
-        if (Input::get('checkImage') === '1')
+        $today = date('Y-m-d');
+        
+        //dd($path);
+        
+        if (Input::get('checkImage') == '1')
         {
-            Photo::create(array('path' => 'http://eduline.dev/images/articles/' .$fileName, 'name' => $input['name'] ));
-            $image = Image::make($input['fileName']->getRealPath());
-            File::exists($path) or File::makeDirectory($path);
-            $image->save($path . $fileName, 100);
+        	if ($input['fileName']->isValid()) {
+        		$extension = Input::file('fileName')->getClientOriginalExtension();
+        		$fileName = time() .'-'.$fileName;
+        		Input::file('fileName')->move($path, $fileName);
+        		Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'.$fileName, 'name' => $input['name'] ));
+        	}
+            /*$image = Image::make($input['fileName']->getRealPath());
+            //File::exists($path) or File::makeDirectory($path);
+            dd($image);
+            $image->save($path . $today .'-'. $fileName, 100);
+            
+            //Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'. $today .'-' . $fileName, 'name' => $input['name'] ));
+            
+            dd($image->response());*/
         }
         else
         {
-            if (Input::get('checkImage') === '2')
+            if (Input::get('checkImage') == '2')
             {
-                Photo::create(array('path' => 'http://eduline.dev/images/articles/'. '300x300-' .$fileName, 'name' => $input['name'] ));
+            	if ($input['fileName']->isValid()) {
+        		$extension = Input::file('fileName')->getClientOriginalExtension();
+        		$fileName = time() .'-'.$fileName;
+        		Input::file('fileName')->move($path, $fileName);
+        		$image = Image::make($path.''.$fileName);
+        		$image->fit(300);
+        		$image->save();        		
+        		Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'.$fileName, 'name' => $input['name'] ));
+        	}
+                /*Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'. '-300x300-' .$fileName, 'name' => $input['name'] ));
                 $image = Image::make($input['fileName']->getRealPath());
                 File::exists($path) or File::makeDirectory($path);
-                $image->crop(300, 300)->save($path . '300x300-' . $fileName, 100);
+                $image->crop(300, 300)->save($path . $today .'-300x300-' . $fileName, 100);*/
             }
             else
             {

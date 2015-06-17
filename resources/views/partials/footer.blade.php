@@ -4,20 +4,20 @@
             <div class="col-md-3">
                 <h4>Сайтын тухай</h4>
                 <ul>
-                    <li><a href="#">Эхлэл</a></li>
+                    <li><a href="/">Эхлэл</a></li>
                     <li><a href="#">Нийт онцлох</a></li>
-                    <li><a href="#">Нийт мэдээ</a></li>
+                    <li><a href="/articles">Нийт мэдээ</a></li>
                     <li><a href="#">Танд тустай</a></li>
                 </ul>
             </div>
             <div class="col-md-3">
                 <h4>Улс орон</h4>
                 <ul>
-                    <li><a href="#">Америк улс</a></li>
-                    <li><a href="#">Солонгос улс</a></li>
-                    <li><a href="#">Австрали улс</a></li>
-                    <li><a href="#">Канад улс</a></li>
-                    <li><a href="#">Япон улс</a></li>
+                    <li><a href="countries/1">Америк улс</a></li>
+                    <li><a href="countries/2">Солонгос улс</a></li>
+                    <li><a href="countries/3">Австрали улс</a></li>
+                    <li><a href="countries/4">Канад улс</a></li>
+                    <li><a href="countries/5">Япон улс</a></li>
                 </ul>
             </div>
             <div class="col-md-3">
@@ -30,12 +30,12 @@
                 </ul>
             </div>
             <div class="col-md-3">
-                <h4>Таньд хэрэгтэй</h4>
+                <h4></h4>
                 <ul>
-                    <li><a href="#">123</a></li>
-                    <li><a href="#">123</a></li>
-                    <li><a href="#">123</a></li>
-                    <li><a href="#">123</a></li>
+                    <li><a href="#"></a></li>
+                    <li><a href="#"></a></li>
+                    <li><a href="#"></a></li>
+                    <li><a href="#"></a></li>
                 </ul>
             </div>
         </div>

@@ -21,4 +21,6 @@
         @endforeach
         </tbody>
     </table>
+    
+     <?php echo $photos->render(); ?>
 @stop

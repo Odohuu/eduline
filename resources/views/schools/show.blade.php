@@ -11,7 +11,7 @@
                 <article>
                     <p><a>{!! Html::image($flagPath, '', array('height' => 40,'class' => 'flag')) !!}</a></p>
                     <section>
-                        <a>Сургуулийн зурэглэл: {{ $school->rank }}</a>
+                        <a>Сургуулийн зэрэглэл: {{ $school->rank }}</a>
                         <p>{!! str_limit( $school->description, 650) !!}</p>
                     </section>
                 </article>
