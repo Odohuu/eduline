@@ -50,7 +50,7 @@ nav.main2{
     margin:0;
     border-top: 1px solid #dee0df;
     background-color: #fff;
-    border-bottom: 2px solid #B2C0BF;
+    border-bottom: 2px solid #217774;
     z-index: 5;
 }
 nav.main2 ul.main2-nav, ul.main2-nav-fixed{
@@ -178,6 +178,18 @@ nav.main2 .main2-nav-fixed li a{
 }
 
 .flag{
+    border: 1px solid #eee;
+}
+.position{
+    position: relative;
+}
+.flag_position{
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    border: 1px solid #eee;
+}
+.image_border{
     border: 1px solid #eee;
 }
 /*layout start*/
