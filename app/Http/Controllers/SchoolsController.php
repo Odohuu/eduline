@@ -21,18 +21,9 @@ class SchoolsController extends Controller {
 	 */
 	public function index()
 	{
-		$usa_schools = Country::findOrFail(1)->schools()->orderBy('rank')->get();
-		$usa_schools_flag = Country::findOrFail(1);
-		$korea_schools = Country::findOrFail(2)->schools()->orderBy('rank')->get();
-		$korea_schools_flag = Country::findOrFail(2);
-		$australia_schools = Country::findOrFail(3)->schools()->orderBy('rank')->get();
-		$australia_schools_flag = Country::findOrFail(3);
-		$canada_schools = Country::findOrFail(4)->schools()->orderBy('rank')->get();
-		$canada_schools_flag = Country::findOrFail(4);
-		$japan_schools = Country::findOrFail(5)->schools()->orderBy('rank')->get();
-		$japan_schools_flag = Country::findOrFail(5);
-		
-		return view('schools.index', compact('usa_schools','usa_schools_flag','korea_schools','korea_schools_flag', 'australia_schools','australia_schools_flag', 'canada_schools','canada_schools_flag', 'japan_schools', 'japan_schools_flag'));
+		$schools = School::latest('created_at')->get();
+
+        return view('schools.index', compact('schools'));
 	}
 
 	/**

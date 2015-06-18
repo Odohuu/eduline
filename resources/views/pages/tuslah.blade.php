@@ -1,7 +1,7 @@
 <div class="main-div-white">
     <div class="container">
         <div class="row headerspace">
-            <div class="col-md-8"><h3>ТАНЫ ТУСЛАХ</h3></div>
+            <div class="col-md-8"><h3>Танд ойрхон</h3></div>
             <div class="col-md-4 text-right"></div>
         </div>
             <div class="row">

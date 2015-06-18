@@ -19,6 +19,7 @@ class PhotosController extends Controller {
     public function index()
     {
         $photos = Photo::latest('created_at')->paginate(10);
+
         return view('photos.index', compact('photos'));
     }
 
@@ -34,13 +35,15 @@ class PhotosController extends Controller {
         $fileName = $input['fileName']->getClientOriginalName();
         $today = date('Y-m-d');
         
+        //dd($path);
+        
         if (Input::get('checkImage') == '1')
         {
         	if ($input['fileName']->isValid()) {
         		$extension = Input::file('fileName')->getClientOriginalExtension();
         		$fileName = time() .'-'.$fileName;
         		Input::file('fileName')->move($path, $fileName);
-        		Photo::create(array('path' => $fileName, 'name' => $input['name'] ));
+        		Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'.$fileName, 'name' => $input['name'] ));
         	}
             /*$image = Image::make($input['fileName']->getRealPath());
             //File::exists($path) or File::makeDirectory($path);
@@ -61,8 +64,8 @@ class PhotosController extends Controller {
         		Input::file('fileName')->move($path, $fileName);
         		$image = Image::make($path.''.$fileName);
         		$image->fit(300);
-        		$image->save($fileName, 100);        		
-        		Photo::create(array('path' => $fileName, 'name' => $input['name'] ));
+        		$image->save();        		
+        		Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'.$fileName, 'name' => $input['name'] ));
         	}
                 /*Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'. '-300x300-' .$fileName, 'name' => $input['name'] ));
                 $image = Image::make($input['fileName']->getRealPath());
@@ -83,27 +86,20 @@ class PhotosController extends Controller {
         return view('photos.show', compact('photo'));
     }
 
-    public function thumbnail($id)
+    public function thumbnail(Photo $photo)
     {
-
+//        $photo->findOrFail()
+//        return view('', compact(''));
     }
 
-     public function edit($id)
+     public function edit(Photo $photo)
      {
-        $photo = Photo::findOrFail($id);
-
         return view('photos.edit', compact('photo' ));
      }
 
     public function destroy($id)
     {
-        $fileName = Photo::findOrFail($id)->path;
-        $path = public_path('images/articles/');
-
-        File::delete($path.''.$fileName);
-        Photo::findOrFail($id)->delete();
-
-        return redirect('photos');
+        //
     }
 
 }

@@ -3,7 +3,6 @@
 use App\Article;
 use App\Category;
 use App\School;
-use App\Country;
 
 class WelcomeController extends Controller {
 
@@ -35,7 +34,7 @@ class WelcomeController extends Controller {
 	 */
 	public function index()
 	{
-		$schools= School::orderBy('rank')->limit('3')->get();
+		$schools= School::latest('created_at')->limit('3')->get();
 		$news = Category::findOrFail(1)->articles()->latest('created_at')->limit('3')->get();
 		// dd($news);
 		$students = Category::findOrFail(5)->articles()->latest('published_at')->published()->limit('3')->orderBy('created_at')->get();

@@ -37,13 +37,14 @@
                 @if(count($schools)>0)
                     <div class="row">
                         @foreach($schools as $school)
-                            <div class="col-md-4 position">
+                            <div class="col-md-4">
 	                            @if($school->thumbnail != ".")
                             		<a href="{{ url('/schools', $school->id) }}">
                                     	{!! Html::image($school->thumbnail, $school->thumbnail, array('width' => 300, 'height' => 300)) !!}
                                     	</a>
                                     @endif
-                                    <h4 class="text-center"><a href="{{ url('/schools', $school->id) }}">{!! str_limit($school->name, 55)  !!}</a></h4>
+                                    <h4><a href="{{ url('/schools', $school->id) }}">{!! str_limit($school->name, 55)  !!}</a></h4>
+                                    <span class="date">Хугацаа: {{ $school->created_at }}</span>
                                 </article>
                             </div>
                         @endforeach

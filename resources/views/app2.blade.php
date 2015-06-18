@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>Eduline LLC</title>
-    <link rel=icon href="{{ asset('/images/sites/favicon.ico') }}" sizes="32x32" type="image/vnd.microsoft.icon">
+
     {{--css--}}
     <link href="{{ asset('/css/app.css') }}" rel="stylesheet">
     <link href="{{ asset('/css/style.css') }}" rel="stylesheet">

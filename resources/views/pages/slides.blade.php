@@ -10,7 +10,7 @@
                 <div class="slide02">
                     <div style="width="960px;"></div>
                     <a href="http://edulinellc.mn/articles/40" class="btn btn-info btn-xs" style="position: absolute; right: 480px; bottom: 30px; z-index: 1; ">Дэлгэрэнгүй</a>
-                    <div style="height:390px;background:url('/images/slides/korea-summer-1920x390.jpg') no-repeat center top;"></div>
+                    <div style="height:390px;background:url('/images/slides/20150406-slide.jpg') no-repeat center top;"></div>
                 </div>
                 <div class="slide03" >
                     <div style="width="960px;"></div>
@@ -20,12 +20,12 @@
                 <div class="slide04">
                     <div style="width="960px;"></div>
                     <a href="#" class="btn btn-info btn-xs" style="position: absolute; right: 480px; bottom: 30px; z-index: 1; ">Дэлгэрэнгүй</a>
-                    <div style="height:390px;background:url('/images/slides/USA-summer-1920x390.jpg') no-repeat center top;"></div>
+                    <div style="height:390px;background:url('/images/slides/usa-study.jpg') no-repeat center top;"></div>
                 </div>
                 <div class="slide05" >
                     <div style="width="960px;"></div>
                     <a href="http://edulinellc.mn/articles/17" class="btn btn-info btn-xs" style="position: absolute; right: 480px; bottom: 30px; z-index: 1; ">Дэлгэрэнгүй</a>
-                    <div style="height:390px;background:url('/images/slides/niseh-1920x390.jpg') no-repeat center top;"></div>
+                    <div style="height:390px;background:url('/images/slides/niseh.jpg') no-repeat center top;"></div>
                 </div>
             </div>
             <script>
