@@ -26,6 +26,9 @@ Route::get('thumbnail', 'PhotosController@thumbnail');
 Route::resource('schools', 'SchoolsController');
 Route::resource('countries', 'CountriesController');
 
+Route::resource('albums', 'AlbumsController');
+Route::resource('images', 'ImagesController');
+
 Route::get('editor','WelcomeController@editor');
 
 

@@ -1,7 +1,7 @@
 <div class="main-div-white">
     <div class="container">
         <div class="row headerspace">
-            <div class="col-md-8"><h3>Танд ойрхон</h3></div>
+            <div class="col-md-8"><h3>ТАНЫ ТУСЛАХ</h3></div>
             <div class="col-md-4 text-right"></div>
         </div>
             <div class="row">
@@ -14,10 +14,7 @@
                     </div>
                 <div class="col-md-4">
                     <article>
-                        {!! Html::image('http://edulinellc.mn/images/articles/300x300-logo.jpg', '', array('width' => 300, 'height' => 300)) !!}
-                        <h4><a href=""></a></h4>
-                        <br>
-                        {{--<div class="body">{{ $articles->content }}</div>--}}
+                        <iframe id="forecast_embed" type="text/html" frameborder="0" height="310" width="305" src="http://tsag-agaar.gov.mn/embed/?name=292&color=217774&color2=217774&color3=ffffff&color4=ffffff&type=vertical&tdegree=cwidth=300"> 		 </iframe>
                     </article>
                 </div>
                 <div class="col-md-4">
@@ -38,4 +35,3 @@
             fjs.parentNode.insertBefore(js, fjs);
         }(document, 'script', 'facebook-jssdk'));</script>
 </div>
-

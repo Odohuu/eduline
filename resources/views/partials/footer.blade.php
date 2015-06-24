@@ -5,9 +5,9 @@
                 <h4>Сайтын тухай</h4>
                 <ul>
                     <li><a href="/">Эхлэл</a></li>
-                    <li><a href="#">Нийт онцлох</a></li>
                     <li><a href="/articles">Нийт мэдээ</a></li>
-                    <li><a href="#">Танд тустай</a></li>
+                    <li><a href="/schools">Сургуулиуд</a></li>
+                    <li><a href="/contact">Холбоо барих</a></li>
                 </ul>
             </div>
             <div class="col-md-3">
@@ -23,10 +23,10 @@
             <div class="col-md-3">
                 <h4>Бидний тухай</h4>
                 <ul>
-                    <li><a href="#">Компаний тухай</a></li>
-                    <li><a href="#">Захиралын мэндчилгээ</a></li>
-                    <li><a href="#">Түүнийн хуудас</a></li>
-                    <li><a href="#">Үйл ажиллагааны онцлог</a></li>
+                    <li><a href="/articles/23">Компаний тухай</a></li>
+                    <li><a href="/articles/24">Захирлын мэндчилгээ</a></li>
+                    <!-- <li><a href="#">Түүнийн хуудас</a></li>
+                    <li><a href="#">Үйл ажиллагааны онцлог</a></li> -->
                 </ul>
             </div>
             <div class="col-md-3">

@@ -17,13 +17,18 @@
                 @foreach($row as $article)
                     <div class="col-md-4">
                         <article>
-                            <!-- {!! Html::image($article->thumbnail, $article->thumbnail, array('width' => 300, 'height' => 300)) !!} -->
+                        	@if($article->thumbnail != ".")
+                        	<a href="{{ url('/articles', $article->id) }}">
+                            		{!! Html::image($article->thumbnail, $article->thumbnail, array('width' => 300, 'height' => 125)) !!}
+                            	</a>
+                            	@endif
                             <h4><a href="{{ url('/articles', $article->id) }}">{!! str_limit($article->title, 55)  !!}</a></h4>
                             <span class="date">Хугацаа: {{ $article->created_at }}</span>
                         </article>
                     </div>
                 @endforeach
             </div>
+            <br />
         @endforeach
     </div>
     <div class="container">
@@ -40,8 +45,8 @@
                             	{!! Html::image($school->thumbnail, $school->thumbnail, array('width' => 300, 'height' => 300)) !!}
                             	</a>
                             	@endif
-                            <h4><a href="{{ url('/schools', $school->id) }}">{!! str_limit($school->name, 55)  !!}</a></h4>
-                            <span class="date">Хугацаа: {{ $school->created_at }}</span>
+                            <h4 class="text-center"><a href="{{ url('/schools', $school->id) }}">{!! str_limit($school->name, 55)  !!}</a></h4>
+                            <center><span class="date">Хугацаа: {{ $school->created_at }}</span></center>
                         </article>
                     </div>
                 @endforeach

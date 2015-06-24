@@ -29,6 +29,7 @@
             });
         });
     </script>
+    
 
 </head>
 <body>
@@ -44,9 +45,7 @@
 
         @yield('content')
     </div>
-    <div class="container">
-        
-    </div>
+    
 
     <!-- select2 -->
     <script src="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.0-rc.2/js/select2.min.js"></script>
@@ -55,5 +54,6 @@
         $('div.alert').not('.alert-important').delay(3000).slideUp(300);
     </script>
     @yield('footer')
+    
 </body>
 </html>

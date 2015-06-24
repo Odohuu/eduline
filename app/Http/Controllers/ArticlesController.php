@@ -68,6 +68,7 @@ class ArticlesController extends Controller {
     {
         $this->createArticle($request);
 
+//        Auth::user()->articles()->create($request->all());
 
         flash()->success('Шинээр нийтлэл үүсгэгдлээ');
 
@@ -80,6 +81,7 @@ class ArticlesController extends Controller {
      */
     public function edit(Article $article)
     {
+//        $tags = Tag::lists('name', 'id');
         $categories = Category::lists('name', 'id');
 
         return view('articles.edit', compact('article', 'categories' ));
@@ -87,7 +89,10 @@ class ArticlesController extends Controller {
 
     public function update(ArticleRequest $request, Article $article)
     {
+       //
         $article->update($request->all());
+
+//        $this->SyncTags($articles, $request->input('tag_list'));
 
         return redirect('allArticles');
     }
@@ -95,9 +100,21 @@ class ArticlesController extends Controller {
     public function destroy(Article $article)
     {
         $article->delete();
+        //$article->tags()->detach();
 
-        return redirect('allArticles');
+        return redirect('articles');
     }
+
+    /**
+     * Sync up the last of tags in the database
+     *
+     * @param Article $article
+     * @param array $tags
+     */
+//    private function SyncCategories(Article $article, array $category)
+//    {
+//        $article->category()->sync($category);
+//    }
 
     /**
      * Save a new articles
@@ -106,7 +123,13 @@ class ArticlesController extends Controller {
      */
     private function createArticle(ArticleRequest $request)
     {
+//        dd($request->input('category_list'));
+//        $this->articles()->category_id($request->input('category_list'));
+//        dd($request->all());
+
         $article = Auth::user()->articles()->create($request->all());
+        //$this->articles()->category_id($request->input('category_id'));
+//
 
         return $article;
     }
