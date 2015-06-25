@@ -4,6 +4,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Image extends Model {
 
-	protected $fillable = ['image','description'];
+	protected $fillable = ['image','description','album_id'];
+
+	public function photos()
+    {
+        return $this->belongsTo('App\Album');
+    }
 
 }

@@ -27,7 +27,7 @@ Route::resource('schools', 'SchoolsController');
 Route::resource('countries', 'CountriesController');
 
 Route::resource('albums', 'AlbumsController');
-Route::resource('images', 'ImagesController');
+Route::resource('zurag', 'ImagesController');
 
 Route::get('editor','WelcomeController@editor');
 
@@ -41,6 +41,3 @@ Route::get('foo', ['middleware' => 'manager', function()
 {
     return 'this page may only be viewed by managers';
 }]);
-//Route::get('img/{folder}/{path}', function(League\Glide\Server $server, Illuminate\Http\Request $request){
-//    $server->outputImage($request);
-//})->where('path','.+');

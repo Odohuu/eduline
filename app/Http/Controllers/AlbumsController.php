@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 
 use Request;
 use App\Http\Requests\AlbumRequest;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Input;
+use Intervention\Image\Facades\Image;
 
 class AlbumsController extends Controller {
 
@@ -16,7 +19,7 @@ class AlbumsController extends Controller {
 	 */
 	public function index()
 	{
-		$albums = Album::with('Photos')->get();
+		$albums = Album::with('photos')->get();
     	
 		return view('albums.index', compact('albums'));
 	}
@@ -36,21 +39,20 @@ class AlbumsController extends Controller {
 	 *
 	 * @return Response
 	 */
-	public function store(AlbumsRequest $request)
+	public function store()
 	{
-		Category::create($request->all());
+		$input = Input::all();
 		
-		$file = Input::file('cover_image');
+		$file = $input['cover_image'];
+   		
    		$random_name = str_random(8);
-    	$destinationPath = 'albums/';
+    	$path = public_path('images/photos/');
     	$extension = $file->getClientOriginalExtension();
     	$filename=$random_name.'_cover.'.$extension;
-    	$uploadSuccess = Input::file('cover_image')->move($destinationPath, $filename);
-	    $album = Album::create(array(
-	      'name' => Input::get('name'),
-	      'description' => Input::get('description'),
-	      'cover_image' => $filename,
-	    ));
+
+    	$uploadSuccess = Input::file('cover_image')->move($path, $filename);
+
+    	Album::create(array('name' =>$input['name'] , 'description' => $input['description'], 'cover_image' => $filename ));
 
 
 		return redirect('albums');
@@ -64,7 +66,7 @@ class AlbumsController extends Controller {
 	 */
 	public function show($id)
 	{
-		$album = Album::with('Photos')->findOrFail($id);
+		$album = Album::with('photos')->findOrFail($id);
 		return view('albums.show',compact('album'));
 	}
 

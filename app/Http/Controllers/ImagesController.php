@@ -1,9 +1,13 @@
 <?php namespace App\Http\Controllers;
 
+use App\Album;
+use App\Image;
 use App\Http\Requests;
 use App\Http\Controllers\Controller;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Input;
 
 class ImagesController extends Controller {
 
@@ -14,7 +18,8 @@ class ImagesController extends Controller {
 	 */
 	public function index()
 	{
-		
+ 
+		return view('zurag.index');
 	}
 
 	/**
@@ -24,7 +29,9 @@ class ImagesController extends Controller {
 	 */
 	public function create()
 	{
-		
+		$album_names = Album::lists('name', 'id');
+
+		return view('zurag.create', compact('album_names'));
 	}
 
 	/**
@@ -34,19 +41,23 @@ class ImagesController extends Controller {
 	 */
 	public function store()
 	{
-		$file = Input::file('image');
-	    $random_name = str_random(8);
-	    $destinationPath = 'albums/';
-	    $extension = $file->getClientOriginalExtension();
-	    $filename=$random_name.'_album_image.'.$extension;
-	    $uploadSuccess = Input::file('image')->move($destinationPath, $filename);
-	    Image::create(array(
-	      'description' => Input::get('description'),
-	      'image' => $filename,
-	      'album_id'=> Input::get('album_id')
-	    ));
 
-	    return redirect('albums');
+		$input = Input::all();
+		
+		$file = Input::file('image');
+
+	    $random_name = str_random(8);
+	    $path = public_path('images/photos/');
+
+	    $extension = $file->getClientOriginalExtension();
+	    $filename=$random_name.'-'.$extension;
+
+	    $uploadSuccess = Input::file('image')->move($path, $filename);
+
+	    Image::create(array('description' =>$input['description'] , 'image' => $filename, 'album_id'=>$input['album_id'] ));
+
+
+	    return redirect('albums'); //array('id'=>Input::get('album_id'))
 	}
 
 	/**
