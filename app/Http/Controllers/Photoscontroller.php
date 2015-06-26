@@ -4,6 +4,7 @@ use App\Http\Requests;
 use App\Http\Controllers\Controller;
 
 use App\Photo;
+use App\Album;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Input;
@@ -31,47 +32,52 @@ class PhotosController extends Controller {
     {
         $input = Input::all();
         $path = public_path('images/articles/');
+        $path2 = public_path('images/photos/');
         $fileName = $input['fileName']->getClientOriginalName();
-        $today = date('Y-m-d');
+        $random_name = str_random(8);
         
         if (Input::get('checkImage') == '1')
         {
         	if ($input['fileName']->isValid()) {
         		$extension = Input::file('fileName')->getClientOriginalExtension();
+
         		$fileName = time() .'-'.$fileName;
         		Input::file('fileName')->move($path, $fileName);
         		Photo::create(array('path' => $fileName, 'name' => $input['name'] ));
         	}
-            /*$image = Image::make($input['fileName']->getRealPath());
-            //File::exists($path) or File::makeDirectory($path);
-            dd($image);
-            $image->save($path . $today .'-'. $fileName, 100);
-            
-            //Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'. $today .'-' . $fileName, 'name' => $input['name'] ));
-            
-            dd($image->response());*/
+
         }
         else
         {
             if (Input::get('checkImage') == '2')
             {
             	if ($input['fileName']->isValid()) {
-        		$extension = Input::file('fileName')->getClientOriginalExtension();
-        		$fileName = time() .'-'.$fileName;
-        		Input::file('fileName')->move($path, $fileName);
-        		$image = Image::make($path.''.$fileName);
-        		$image->fit(300);
-        		$image->save();        		
+                    $fileName = time() .'-'.$fileName;
+        		//$extension = Input::file('fileName')->getClientOriginalExtension();
+        		//Input::file('fileName')->move($path, $fileName);
+        		$image = Image::make(Input::file('fileName'));
+        		$image->resize(300,null, function ($constraint) { $constraint->aspectRatio(); });
+        		$image->save($path2.$fileName,100);        		
         		Photo::create(array('path' => $fileName, 'name' => $input['name'] ));
-        	}
-                /*Photo::create(array('path' => 'http://edulinellc.mn/images/articles/'. '-300x300-' .$fileName, 'name' => $input['name'] ));
-                $image = Image::make($input['fileName']->getRealPath());
-                File::exists($path) or File::makeDirectory($path);
-                $image->crop(300, 300)->save($path . $today .'-300x300-' . $fileName, 100);*/
+        	       }                
             }
             else
             {
-                return Redirect('photos');
+                if (Input::get('checkImage') == '3') 
+                {
+                    if ($input['fileName']->isValid()) {
+                        $fileName = $random_name .'-'.$fileName;
+                        //Input::file('fileName')->move($path2, $fileName);
+                        // Input::file('fileName')
+                        $image = Image::make(Input::file('fileName'));
+                        $image->resize(null, 700, function ($constraint) { $constraint->aspectRatio(); $constraint->upsize();});
+                        $image->save($path2.$fileName,100);
+
+                        Photo::create(array('path' => $fileName, 'name' => $input['name'] ));
+                    }
+                }else{
+                     return Redirect('photos');
+                }
             }
         }
 
@@ -104,6 +110,16 @@ class PhotosController extends Controller {
         Photo::findOrFail($id)->delete();
 
         return redirect('photos');
+    }
+    public function delete($id)
+    {
+        $fileName = Image::findOrFail($id)->path;
+        $path = public_path('images/photos/');
+
+        File::delete($path.''.$fileName);
+        Image::findOrFail($id)->delete();
+
+        return redirect('albums');
     }
 
 }

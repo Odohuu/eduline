@@ -8,10 +8,12 @@
     {!! Form::open(['route' => 'photos.store', 'files' => true]) !!}
         
         <div class="form-group">
-            {!! Form::label('name','энгийн зураг:') !!}
+            {!! Form::label('name','  энгийн зураг:') !!}
             {!! Form::radio('checkImage', 1, true, ['class' => 'field']) !!}
-            {!! Form::label('name','мэдээний нүүр зураг:') !!}
+            {!! Form::label('name','  мэдээний нүүр зураг:') !!}
             {!! Form::radio('checkImage', 2, false, ['class' => 'field']) !!}
+            {!! Form::label('name','  Фото цомгийн зураг:') !!}
+            {!! Form::radio('checkImage', 3, false, ['class' => 'field']) !!}
         </div>
         <div class="form-group">
             {!! Form::label('name','name:') !!}

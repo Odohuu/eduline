@@ -8,7 +8,7 @@ class Album extends Model {
 
     public function photos()
     {
-        return $this->hasMany('App\Image');
+        return $this->hasMany('App\Photo');
     }
 
 }

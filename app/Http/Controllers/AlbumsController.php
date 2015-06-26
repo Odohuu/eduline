@@ -47,7 +47,8 @@ class AlbumsController extends Controller {
    		
    		$random_name = str_random(8);
     	$path = public_path('images/photos/');
-    	$extension = $file->getClientOriginalExtension();
+    	$extension = $file->getClientOriginalName();
+
     	$filename=$random_name.'_cover.'.$extension;
 
     	$uploadSuccess = Input::file('cover_image')->move($path, $filename);
@@ -78,7 +79,8 @@ class AlbumsController extends Controller {
 	 */
 	public function edit($id)
 	{
-		//
+		$album = Album::with('photos')->findOrFail($id);
+		return view('albums.edit',compact('album'));
 	}
 
 	/**

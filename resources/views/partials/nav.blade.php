@@ -44,6 +44,14 @@
                         <li><a href="/schools/create">Шинэээр үүсгэх</a></li>
                       </ul>
                 </li>
+                <li class="{{ Request::is('albums') ? 'active' : '' }} dropdown">
+                    <a href="/albums" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Фото цомог <span class="caret"></span></a>
+                      <ul class="dropdown-menu" role="menu">
+                        <li><a href="/albums">Фото цомог засах</a></li>
+                        <li class="divider"></li>
+                        <li><a href="/albums/create">Шинэээр үүсгэх</a></li>
+                      </ul>
+                </li>
                 
             </ul>
             <ul class="nav navbar-nav navbar-right">

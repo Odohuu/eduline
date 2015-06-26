@@ -1,39 +1,47 @@
-@extends('app')
+@extends('app2')
 
 @section('content')
     
     <div class="container">
-    
-      <div class="starter-template">
-        <div class="media">
-          <img class="media-object pull-left"alt="{{ $album->name }}" src="/images/photos/{{ $album->cover_image }}" width="300px">
-          <div class="media-body">
-            <h2>Album Name:</h2>
-            <p>{{$album->name}}</p>
-          <div class="media">
-            <h2>AlbumDescription :</h2>
-            <p>{{$album->description}}<p>
-            <a href="{{ URL::route('zurag.create') }}"><button type="button"class="btn btn-primary btn-large">Add New Image to Album</button></a>
-            <a href="{{ URL::route('albums.destroy', array('id'=>$album->id)) }}" onclick="return confirm('Are yousure?')"><button type="button"class="btn btn-danger btn-large">Delete Album</button></a>
-        </div>
+      <div>
+      <h3>{{$album->name}}</h3>
+      <p>{{$album->description}}<p>
       </div>
-    </div>
-    </div>
-      <div class="row">
+      <div class="owl-album" style="width:855px; overflow:hidden;">
         @foreach($album->photos as $photo)
-          <div class="col-lg-3">
-            <div class="thumbnail" style="max-height: 350px;min-height: 350px;">
-              <img alt="{{$album->name}}" src="/albums/{{$photo->image}}">
-              <div class="caption">
-                <p>{{$photo->description}}</p>
-                <p><p>Created date:  {{ date("d F Y",strtotime($photo->created_at)) }} at {{ date("g:ha",strtotime($photo->created_at)) }}</p></p>
-                <a href="{{URL::route('albums.destroy',array('id'=>$photo->id))}}" onclick="return confirm('Are you sure?')"><button type="button" class="btnbtn-danger btn-small">Delete Image </button></a>
-              </div>
+            <div class="item">
+              <img alt="{{$album->name}}" src="/images/photos/{{ $photo->path }}">
             </div>
-          </div>
         @endforeach
       </div>
-    </div>
+      <div class="owl-nav">
+            <div class="owl-prev">prev</div>
+            <div class="owl-next">next</div>
 
-    @include('errors.list')
+            <a class="button secondary play" style="cursor:pointer;">Play</a>
+            <a class="button secondary stop" style="cursor:pointer;">Stop</a>
+      </div>
+      
+    </div>
+    <script>
+      $(document).ready(function(){
+        $(".owl-album").owlCarousel({
+          items:1,
+          rtl:true,
+          center:true,
+          loop:true,
+          margin:30,
+          autoWidth:true,
+          autoplay:true,
+          autoplayTimeout:2000,
+          autoplayHoverPause:true
+        });
+      });
+      $('.play').on('click',function(){
+          owl.trigger('autoplay.play.owl',[1000])
+      })
+      $('.stop').on('click',function(){
+          owl.trigger('autoplay.stop.owl')
+      })
+    </script>
 @stop

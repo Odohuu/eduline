@@ -13,7 +13,7 @@
         @foreach($photos as $photo)
             <tr>
                 <th scope="row">{{ $photo->id }}</th>
-                <td>{!! Html::image($photo->path, $photo->name, array('width' => 100)) !!}</td>
+                <td>{!! Html::image('/images/articles/'.$photo->path, $photo->name, array('width' => 100)) !!}</td>
                 <td>http://edulinellc.mn/images/articles/{{ $photo->path }}</td>
                 <td>{{ $photo->name }}</td>
                 <td><a class="btn btn-warning" href="{{ url('photos/'. $photo->id. '/edit', '') }}" role="button">Засах</a></td>
@@ -22,5 +22,5 @@
         </tbody>
     </table>
     
-     <?php echo $photos->render(); ?>
+     {!! $photos->render() !!}
 @stop

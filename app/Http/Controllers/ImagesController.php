@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Input;
+use Intervention\Image\Facades\Image;
 
 class ImagesController extends Controller {
 
@@ -49,10 +50,13 @@ class ImagesController extends Controller {
 	    $random_name = str_random(8);
 	    $path = public_path('images/photos/');
 
-	    $extension = $file->getClientOriginalExtension();
+	    $extension = $file->getClientOriginalName();
 	    $filename=$random_name.'-'.$extension;
 
-	    $uploadSuccess = Input::file('image')->move($path, $filename);
+	    //$uploadSuccess = Input::file('image')->move($path, $filename);
+	    $image = Image::make($path.''.$filename);
+        $image->fit(960);
+        $image->save(); 
 
 	    Image::create(array('description' =>$input['description'] , 'image' => $filename, 'album_id'=>$input['album_id'] ));
 
@@ -101,7 +105,13 @@ class ImagesController extends Controller {
 	 */
 	public function destroy($id)
 	{
-		//
+		$fileName = Image::findOrFail($id)->path;
+        $path = public_path('images/photos/');
+
+        File::delete($path.''.$fileName);
+        Image::findOrFail($id)->delete();
+
+        return redirect('albums');
 	}
 
 }
