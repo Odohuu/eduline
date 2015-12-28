@@ -1,0 +1,44 @@
+@import "bootstrap/bootstrap";
+@import "style";
+@import "slider";
+
+h5 a{
+  color: #666;
+}
+a{
+  &:hover {
+    
+    text-decoration: none;
+  }
+  &:visited{
+    text-decoration: none;
+  }
+}
+
+.page-header{
+  margin:40px 0 20px;
+}
+.navbar-nav {
+  border-radius: 0;
+}
+.navbar-nav > li > a{
+  font-size: 14px;
+}
+.navbar-default .navbar-nav > .active > a, .navbar-default .navbar-nav > .active > a:hover{
+  color: #fff;
+  background-color: #217774;
+}
+.navbar-nav .flag_of_size{
+  width: 140px;
+}
+.navbar-nav li .flag_of{
+  height: 71px;
+  display: block; 
+  text-align: center;
+}
+.navbar-nav li .flag_of img{
+  margin: 0 auto 3px auto; 
+}
+.table>tbody>tr>td, .table>tbody>tr>th, .table>tfoot>tr>td, .table>tfoot>tr>th, .table>thead>tr>td, .table>thead>tr>th{
+    vertical-align: middle;
+}
